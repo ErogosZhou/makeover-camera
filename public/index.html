@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FDFCFB">
+    <title>Makeover Camera | One-Click Room Redesign & Shopping List</title>
+    <meta name="description" content="Transform your room with AI and get a curated shopping list instantly. Upload a photo, get styled results.">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cream': '#FDFCFB',
+                        'sage': '#4A5D4E',
+                        'sage-light': '#E8EDE9',
+                        'charcoal': '#1A1A1A',
+                        'terracotta': '#C27D63',
+                        'gold': '#B38B59'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'sans-serif'],
+                        'serif': ['Playfair Display', 'serif'],
+                    },
+                    boxShadow: {
+                        'premium': '0 20px 50px rgba(0, 0, 0, 0.05)',
+                        'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.02)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #FDFCFB; color: #1A1A1A; }
+
+        .serif-italic { font-family: 'Playfair Display', serif; font-style: italic; }
+
+        .upload-area {
+            border: 2px dashed #D1D5DB;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #FFFFFF;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #4A5D4E;
+            background: #F8FAF8;
+            transform: scale(1.01);
+        }
+
+        .btn-sage {
+            background-color: #4A5D4E;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-sage:hover {
+            background-color: #3D4D41;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(74, 93, 78, 0.3);
+        }
+        .btn-sage:active { transform: translateY(0); }
+
+        .style-chip {
+            transition: all 0.2s ease;
+        }
+        .style-chip.selected {
+            background-color: #4A5D4E;
+            color: white;
+        }
+
+        /* Slider */
+        .slider-container {
+            position: relative;
+            width: 100%;
+            height: 450px;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+        .slider-img {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .slider-handle {
+            position: absolute;
+            top: 0; bottom: 0; left: 50%;
+            width: 3px; background: white;
+            cursor: ew-resize; z-index: 30;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .slider-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px; height: 48px;
+            background: white; border-radius: 50%;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234A5D4E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='15 18 9 12 15 6'%3E%3C/polyline%3E%3Cpolyline points='9 18 15 12 9 6'%3E%3C/polyline%3E%3C/svg%3E");
+            background-position: center; background-repeat: no-repeat;
+        }
+
+        /* Loading shimmer */
+        .shimmer {
+            background: linear-gradient(90deg, #F3F4F6 25%, #E5E7EB 50%, #F3F4F6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .fade-up {
+            animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(74, 93, 78, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(74, 93, 78, 0.5); }
+        }
+
+        /* Quick mode toggle */
+        .mode-toggle {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="font-sans antialiased" x-data="homeGlow()" x-init="init()">
+
+    <div class="min-h-screen flex flex-col">
+
+        <!-- Navigation -->
+        <nav class="border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+            <div class="max-w-screen-xl mx-auto px-6 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl font-serif font-bold tracking-tight">Makeover Camera<span class="text-sage">.</span></span>
+                    <span class="hidden sm:inline text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold border-l pl-3 border-gray-200">AI Room Makeover</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- Quick Mode Toggle -->
+                    <div class="mode-toggle rounded-full px-3 py-1.5 flex items-center gap-2 text-xs">
+                        <span class="text-gray-500">Quick</span>
+                        <button @click="quickMode = !quickMode"
+                                class="w-10 h-5 rounded-full transition-colors relative"
+                                :class="quickMode ? 'bg-sage' : 'bg-gray-200'">
+                            <span class="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                                  :class="quickMode ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <main class="flex-grow max-w-screen-xl mx-auto px-6 w-full py-8">
+
+            <!-- ==================== STEP 1: UPLOAD ==================== -->
+            <section x-show="step === 1" x-cloak class="max-w-4xl mx-auto text-center space-y-8 py-8 fade-up">
+
+                <!-- Hero -->
+                <div class="space-y-4">
+                    <h1 class="text-4xl md:text-6xl font-serif leading-tight">
+                        One photo.<br>
+                        <span class="serif-italic text-sage">Instant makeover.</span>
+                    </h1>
+                    <p class="text-gray-500 text-lg font-light max-w-lg mx-auto">
+                        Upload your room photo and get AI-styled results with a curated shopping list.
+                    </p>
+                </div>
+
+                <!-- Upload Area -->
+                <div class="upload-area relative rounded-2xl p-12 md:p-16 flex flex-col items-center justify-center space-y-6 cursor-pointer"
+                     @click="$refs.fileInput.click()"
+                     @dragover.prevent="dragover = true"
+                     @dragleave.prevent="dragover = false"
+                     @drop.prevent="handleDrop($event)"
+                     :class="{ 'dragover': dragover }"
+                     data-testid="upload-area">
+
+                    <input type="file" x-ref="fileInput" @change="handleFileSelect($event)"
+                           accept="image/jpeg,image/png,image/webp" class="hidden" data-testid="file-input">
+
+                    <template x-if="!previewUrl">
+                        <div class="space-y-4">
+                            <div class="w-20 h-20 bg-sage-light rounded-full flex items-center justify-center mx-auto text-sage">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                </svg>
+                            </div>
+                            <div class="space-y-2">
+                                <p class="text-xl font-medium">Drop your room photo here</p>
+                                <p class="text-sm text-gray-400">or click to browse (JPG, PNG, WebP)</p>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="previewUrl">
+                        <div class="w-full space-y-4">
+                            <div class="relative group">
+                                <img :src="previewUrl" class="w-full max-h-[350px] object-cover rounded-lg shadow-premium" data-testid="preview-image">
+                                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
+                                    <span class="bg-white px-4 py-2 rounded-full text-sm font-medium shadow">Change Photo</span>
+                                </div>
+                            </div>
+                            <p class="text-sm font-medium"
+                               :class="uploading ? 'text-gray-400' : 'text-sage'"
+                               x-text="uploading ? 'Uploading...' : (imageId ? 'Ready to style!' : 'Processing...')"
+                               data-testid="upload-status"></p>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Style Selection (shown after upload, collapsed in quick mode) -->
+                <div x-show="previewUrl && !quickMode" x-collapse class="space-y-6 text-left">
+
+                    <!-- Style Pills -->
+                    <div class="space-y-3">
+                        <label class="text-xs font-bold uppercase tracking-widest text-gray-400">Style</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="s in options.styles" :key="s.value">
+                                <button @click="form.style = s.value"
+                                        :class="form.style === s.value ? 'selected' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                                        class="style-chip px-4 py-2 rounded-full text-sm font-medium"
+                                        :data-testid="'style-' + s.value">
+                                    <span x-text="s.label"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Budget Pills -->
+                    <div class="space-y-3">
+                        <label class="text-xs font-bold uppercase tracking-widest text-gray-400">Budget</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="b in options.budgets" :key="b.value">
+                                <button @click="form.budget = b.value"
+                                        :class="form.budget === b.value ? 'selected' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                                        class="style-chip px-4 py-2 rounded-full text-sm font-medium"
+                                        :data-testid="'budget-' + b.value">
+                                    <span x-text="b.label"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <div x-show="previewUrl" class="pt-4">
+                    <button @click="startGeneration()"
+                            :disabled="uploading || !imageId"
+                            class="btn-sage px-10 py-4 rounded-full text-sm font-semibold tracking-wider uppercase shadow-premium disabled:opacity-50 disabled:cursor-not-allowed"
+                            :class="{ 'pulse-glow': imageId && !uploading }"
+                            data-testid="generate-button">
+                        <span x-show="!uploading" class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg>
+                            <span x-text="quickMode ? 'One-Click Makeover' : 'Generate Styled Room'"></span>
+                        </span>
+                        <span x-show="uploading" class="flex items-center gap-2">
+                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Uploading...
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Trust Badges -->
+                <div class="pt-8 flex flex-wrap justify-center gap-6 text-xs text-gray-400">
+                    <span class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        Secure Upload
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        Results in ~30s
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        Shop Direct
+                    </span>
+                </div>
+            </section>
+
+            <!-- ==================== STEP 2: GENERATING ==================== -->
+            <section x-show="step === 2" x-cloak class="max-w-2xl mx-auto py-20 text-center space-y-10 fade-up">
+
+                <div class="relative w-28 h-28 mx-auto">
+                    <div class="absolute inset-0 border-2 border-sage rounded-full animate-[spin_3s_linear_infinite]"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-4xl animate-pulse">
+                            <template x-if="taskProgress < 30">
+                                <span>🔍</span>
+                            </template>
+                            <template x-if="taskProgress >= 30 && taskProgress < 60">
+                                <span>🎨</span>
+                            </template>
+                            <template x-if="taskProgress >= 60 && taskProgress < 90">
+                                <span>🛒</span>
+                            </template>
+                            <template x-if="taskProgress >= 90">
+                                <span>✨</span>
+                            </template>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <h2 class="text-3xl font-serif italic" x-text="taskMessage" data-testid="task-message">Analyzing your space...</h2>
+                    <p class="text-gray-400 text-sm max-w-sm mx-auto">
+                        Our AI is designing your personalized room makeover and finding matching products.
+                    </p>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="max-w-md mx-auto space-y-2">
+                    <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-sage transition-all duration-500 ease-out rounded-full"
+                             :style="{ width: taskProgress + '%' }"
+                             data-testid="progress-bar"></div>
+                    </div>
+                    <p class="text-xs text-gray-400" x-text="taskProgress + '%'"></p>
+                </div>
+
+                <!-- AI Insight Card -->
+                <div x-show="spaceAnalysisText" x-collapse class="p-6 bg-white border border-gray-100 rounded-xl text-left space-y-3 shadow-sm">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-sage">AI Analysis</p>
+                    <p class="text-sm text-gray-600 leading-relaxed" x-text="spaceAnalysisText.substring(0, 200) + '...'"></p>
+                </div>
+            </section>
+
+            <!-- ==================== STEP 3: RESULTS ==================== -->
+            <section x-show="step === 3" x-cloak class="max-w-5xl mx-auto space-y-12 fade-up">
+
+                <!-- Before/After Slider -->
+                <div class="space-y-6">
+                    <div class="flex items-end justify-between">
+                        <div class="space-y-1">
+                            <h2 class="text-4xl font-serif">Your Transformation</h2>
+                            <p class="text-gray-400 text-sm">Drag to compare before & after</p>
+                        </div>
+                        <button @click="reset()" class="text-xs font-bold uppercase tracking-widest text-sage hover:text-charcoal transition-colors flex items-center gap-2" data-testid="reset-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                            New Design
+                        </button>
+                    </div>
+
+                    <div class="slider-container shadow-premium"
+                         @mousemove="moveSlider($event)"
+                         @touchmove.prevent="moveSlider($event.touches[0])"
+                         data-testid="comparison-slider">
+                        <img :src="previewUrl" class="slider-img" alt="Before">
+                        <div class="absolute inset-0 z-10" :style="{ clipPath: `inset(0 0 0 ${sliderPos}%)` }">
+                            <img :src="result?.generated_image_url ? getFullImageUrl(result.generated_image_url) : previewUrl"
+                                 class="w-full h-full object-cover" alt="After" data-testid="generated-image">
+                        </div>
+                        <div class="absolute bottom-4 left-4 z-20 bg-black/50 backdrop-blur text-white px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-widest">Before</div>
+                        <div class="absolute bottom-4 right-4 z-20 bg-sage/80 backdrop-blur text-white px-3 py-1.5 rounded text-[10px] uppercase font-bold tracking-widest">After</div>
+                        <div class="slider-handle" :style="{ left: sliderPos + '%' }"></div>
+                    </div>
+                </div>
+
+                <!-- Shopping List -->
+                <div class="space-y-8 py-8 border-t border-gray-100" data-testid="shopping-list">
+                    <div class="flex items-end justify-between">
+                        <div class="space-y-1">
+                            <h3 class="text-3xl font-serif italic">Shop the Look</h3>
+                            <p class="text-gray-400 text-sm">Curated items to recreate this style</p>
+                        </div>
+                        <div class="text-right" x-show="result?.total_estimated_price">
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold">Est. Total</p>
+                            <p class="text-2xl font-serif text-charcoal">$<span x-text="result?.total_estimated_price?.toFixed(0)"></span></p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <template x-for="(item, index) in result?.shopping_list || []" :key="index">
+                            <div class="group bg-white border border-gray-100 p-6 rounded-xl hover:shadow-premium transition-all duration-300">
+                                <div class="flex gap-4">
+                                    <div class="w-16 h-16 bg-sage-light rounded-lg flex-shrink-0 flex items-center justify-center text-2xl">
+                                        <span x-text="getCategoryIcon(item.identified_item?.category)"></span>
+                                    </div>
+                                    <div class="flex-grow min-w-0">
+                                        <div class="flex items-start justify-between gap-2 mb-1">
+                                            <p class="text-[10px] uppercase font-bold tracking-widest text-sage" x-text="item.identified_item?.category"></p>
+                                            <p class="text-sm font-medium text-gray-500" x-text="item.identified_item?.price_estimate"></p>
+                                        </div>
+                                        <h4 class="font-medium truncate" x-text="item.identified_item?.name"></h4>
+                                        <p class="text-xs text-gray-400 line-clamp-2 mt-1" x-text="item.identified_item?.description"></p>
+                                    </div>
+                                </div>
+
+                                <!-- Product Matches -->
+                                <div class="mt-4 space-y-2" x-show="item.matched_products?.length">
+                                    <template x-for="product in item.matched_products?.slice(0, 2)" :key="product.id">
+                                        <a :href="product.affiliate_link || '#'" target="_blank"
+                                           class="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-sage-light transition-colors group/link">
+                                            <div class="flex items-center gap-3 min-w-0">
+                                                <img :src="product.image_url" class="w-10 h-10 object-cover rounded border border-gray-200"
+                                                     onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect fill=%22%23f3f4f6%22 width=%2240%22 height=%2240%22/></svg>'">
+                                                <div class="min-w-0">
+                                                    <p class="text-xs font-medium text-charcoal truncate" x-text="product.name"></p>
+                                                    <p class="text-[10px] text-gray-400" x-text="getStoreName(product)"></p>
+                                                </div>
+                                            </div>
+                                            <div class="text-right flex-shrink-0 ml-2">
+                                                <p class="text-sm font-bold text-sage">$<span x-text="formatPrice(product.price)"></span></p>
+                                                <p class="text-[8px] uppercase text-gray-300 group-hover/link:text-sage font-bold">Shop</p>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+
+                                <!-- Search Keywords -->
+                                <div x-show="!item.matched_products?.length" class="mt-4 p-3 bg-gray-50 rounded-lg">
+                                    <p class="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Search for:</p>
+                                    <p class="text-xs text-gray-500" x-text="(item.identified_item?.search_keywords || []).slice(0, 3).join(', ')"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div x-show="!result?.shopping_list?.length" class="text-center py-12 text-gray-400">
+                        <p>No items identified. Try uploading a different photo.</p>
+                    </div>
+                </div>
+
+                <!-- CTA -->
+                <div class="text-center py-8 border-t border-gray-100">
+                    <button @click="reset()" class="btn-sage px-12 py-4 rounded-full text-sm font-semibold tracking-wider uppercase shadow-premium">
+                        Design Another Room
+                    </button>
+                </div>
+            </section>
+
+            <!-- ==================== ERROR STATE ==================== -->
+            <section x-show="step === 'error'" x-cloak class="max-w-md mx-auto py-24 text-center space-y-6 fade-up">
+                <div class="w-16 h-16 bg-red-50 text-red-400 rounded-full flex items-center justify-center mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <div class="space-y-2">
+                    <h2 class="text-2xl font-serif italic">Something went wrong</h2>
+                    <p class="text-gray-400 text-sm" x-text="errorMessage" data-testid="error-message">Please try again with a clearer photo.</p>
+                </div>
+                <button @click="reset()" class="btn-sage px-8 py-3 rounded-full text-xs font-semibold tracking-widest uppercase">
+                    Try Again
+                </button>
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-charcoal text-white py-12 mt-auto">
+            <div class="max-w-screen-xl mx-auto px-6">
+                <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl font-serif font-bold">Makeover Camera<span class="text-sage">.</span></span>
+                        <span class="text-gray-500 text-xs">AI Room Makeover</span>
+                    </div>
+                    <div class="flex gap-6 text-sm text-gray-400">
+                        <a href="#" class="hover:text-white transition-colors">Privacy</a>
+                        <a href="#" class="hover:text-white transition-colors">Terms</a>
+                        <a href="mailto:hello@homeglow.ai" class="hover:text-white transition-colors">Contact</a>
+                    </div>
+                </div>
+                <div class="mt-8 pt-6 border-t border-white/10 text-center text-xs text-gray-600">
+                    &copy; 2026 Makeover Camera. Powered by AI.
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+
+        function getFullImageUrl(path) {
+            if (!path) return '';
+            if (path.startsWith('http')) return path;
+            return path.startsWith('/') ? path : '/' + path;
+        }
+
+        function homeGlow() {
+            return {
+                step: 1,
+                quickMode: true, // Default to quick mode for new product positioning
+                dragover: false,
+                uploading: false,
+                selectedFile: null,
+                previewUrl: null,
+                imageId: null,
+                sliderPos: 50,
+                form: {
+                    room_type: 'living_room',
+                    style: 'modern_minimalist',
+                    budget: '400',
+                    custom_prompt: ''
+                },
+                options: {
+                    room_types: [
+                        { value: 'living_room', label: 'Living Room' },
+                        { value: 'bedroom', label: 'Bedroom' },
+                        { value: 'study', label: 'Home Office' },
+                        { value: 'dining_room', label: 'Dining Room' },
+                    ],
+                    styles: [
+                        { value: 'boho', label: 'Boho' },
+                        { value: 'modern_minimalist', label: 'Modern Minimal' },
+                        { value: 'scandinavian', label: 'Scandinavian' },
+                        { value: 'coastal', label: 'Coastal' },
+                        { value: 'industrial', label: 'Industrial' },
+                    ],
+                    budgets: [
+                        { value: '200', label: '$200' },
+                        { value: '400', label: '$400' },
+                        { value: '800', label: '$800' },
+                        { value: '1500', label: '$1500' },
+                    ]
+                },
+                taskId: null,
+                taskStatus: null,
+                taskProgress: 0,
+                taskMessage: 'Preparing...',
+                spaceAnalysisText: '',
+                result: null,
+                errorMessage: '',
+
+                async init() {
+                    await this.loadOptions();
+                },
+
+                async loadOptions() {
+                    try {
+                        const res = await fetch(`${API_BASE}/options?lang=en`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.styles) this.options.styles = data.styles.map(s => ({ value: s.value, label: s.label }));
+                            if (data.budgets) this.options.budgets = data.budgets.map(b => ({ value: b.value, label: b.label }));
+                        }
+                    } catch (e) {
+                        console.log('Using default options');
+                    }
+                },
+
+                moveSlider(e) {
+                    if (this.step !== 3) return;
+                    const container = document.querySelector('.slider-container');
+                    if (!container) return;
+                    const rect = container.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    this.sliderPos = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                },
+
+                getCategoryIcon(category) {
+                    const icons = {
+                        'Textiles': '🛋️',
+                        'Lighting': '💡',
+                        'Plants': '🌿',
+                        'Wall Decor': '🖼️',
+                        'Decor': '📚',
+                        'Rug': '🟫',
+                        'Furniture': '🪑',
+                        'Storage': '📦'
+                    };
+                    return icons[category] || '✨';
+                },
+
+                handleFileSelect(e) {
+                    if (e.target.files[0]) this.processFile(e.target.files[0]);
+                },
+
+                handleDrop(e) {
+                    this.dragover = false;
+                    if (e.dataTransfer.files[0]) this.processFile(e.dataTransfer.files[0]);
+                },
+
+                processFile(file) {
+                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                        alert('Please upload JPG, PNG, or WebP');
+                        return;
+                    }
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('Image must be under 10MB');
+                        return;
+                    }
+                    this.selectedFile = file;
+                    this.previewUrl = URL.createObjectURL(file);
+                    this.imageId = null;
+                    this.uploadImage();
+                },
+
+                async uploadImage() {
+                    if (!this.selectedFile) return;
+                    this.uploading = true;
+                    try {
+                        const fd = new FormData();
+                        fd.append('file', this.selectedFile);
+                        const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+                        if (res.ok) {
+                            const d = await res.json();
+                            this.imageId = d.image_id;
+                        } else {
+                            const e = await res.json();
+                            throw new Error(e.detail || 'Upload failed');
+                        }
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    } finally {
+                        this.uploading = false;
+                    }
+                },
+
+                async startGeneration() {
+                    if (this.uploading || !this.imageId) {
+                        alert('Please wait for the upload to finish.');
+                        return;
+                    }
+
+                    this.step = 2;
+                    this.taskProgress = 0;
+                    this.taskMessage = 'Analyzing your space...';
+                    this.spaceAnalysisText = '';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                    try {
+                        // Start generation
+                        const gfd = new FormData();
+                        gfd.append('image_id', this.imageId);
+                        gfd.append('room_type', this.form.room_type);
+                        gfd.append('style', this.form.style);
+                        gfd.append('budget', this.form.budget);
+                        gfd.append('lang', 'en');
+
+                        // Also start space analysis for visual feedback
+                        const afd = new FormData();
+                        afd.append('image_id', this.imageId);
+                        afd.append('room_type', this.form.room_type);
+                        afd.append('style', this.form.style);
+                        afd.append('budget', this.form.budget);
+                        afd.append('lang', 'en');
+
+                        const [aRes, gRes] = await Promise.all([
+                            fetch(`${API_BASE}/analyze-space`, { method: 'POST', body: afd }).catch(() => null),
+                            fetch(`${API_BASE}/generate`, { method: 'POST', body: gfd })
+                        ]);
+
+                        // Handle analysis response (streaming)
+                        if (aRes?.ok && aRes.body) {
+                            const reader = aRes.body.getReader();
+                            const decoder = new TextDecoder();
+                            let full = '';
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                const chunk = decoder.decode(value, { stream: true });
+                                full += chunk;
+                                // Update analysis text, stripping out the image prompt markers
+                                const promptStart = full.indexOf('[[IMAGE_PROMPT]]');
+                                this.spaceAnalysisText = promptStart !== -1 ? full.slice(0, promptStart).trim() : full.trim();
+                            }
+                            this.taskProgress = Math.max(this.taskProgress, 20);
+                        }
+
+                        // Handle generation response
+                        if (gRes.ok) {
+                            const d = await gRes.json();
+                            this.taskId = d.task_id;
+                            this.pollTaskStatus();
+                        } else {
+                            const e = await gRes.json();
+                            throw new Error(e.detail || 'Failed to create task');
+                        }
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    }
+                },
+
+                async pollTaskStatus() {
+                    if (!this.taskId) return;
+                    try {
+                        const res = await fetch(`${API_BASE}/task/${this.taskId}`);
+                        if (res.ok) {
+                            const d = await res.json();
+                            this.taskStatus = d.status;
+                            this.taskProgress = d.progress || this.taskProgress;
+
+                            // Update message based on progress
+                            if (d.progress < 30) {
+                                this.taskMessage = 'Analyzing your space...';
+                            } else if (d.progress < 60) {
+                                this.taskMessage = 'Generating styled room...';
+                            } else if (d.progress < 90) {
+                                this.taskMessage = 'Finding matching products...';
+                            } else {
+                                this.taskMessage = 'Finalizing results...';
+                            }
+
+                            if (d.status === 'completed') {
+                                this.result = d.result;
+                                if (d.result?.space_analysis && !this.spaceAnalysisText) {
+                                    this.spaceAnalysisText = d.result.space_analysis;
+                                }
+                                this.step = 3;
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                            } else if (d.status === 'failed') {
+                                this.errorMessage = d.message || 'Generation failed';
+                                this.step = 'error';
+                            } else {
+                                setTimeout(() => this.pollTaskStatus(), 2000);
+                            }
+                        }
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    }
+                },
+
+                getStoreName(product) {
+                    return product?.shop_name || product?.store_name || product?.platform || 'Shop';
+                },
+
+                formatPrice(value) {
+                    if (value === null || value === undefined || value === '') return '--';
+                    const num = Number(value);
+                    if (Number.isNaN(num)) return value;
+                    return num.toFixed(0);
+                },
+
+                reset() {
+                    this.step = 1;
+                    this.selectedFile = null;
+                    this.previewUrl = null;
+                    this.imageId = null;
+                    this.taskId = null;
+                    this.taskProgress = 0;
+                    this.spaceAnalysisText = '';
+                    this.result = null;
+                    this.errorMessage = '';
+                    this.uploading = false;
+                    this.form = { room_type: 'living_room', style: 'modern_minimalist', budget: '400', custom_prompt: '' };
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            };
+        }
+    </script>
+</body>
+</html>

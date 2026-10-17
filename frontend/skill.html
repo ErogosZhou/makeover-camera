@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>换装相机 Search — OpenClaw Skill</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #f0ede8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(232,96,60,0.12);
+      border: 1px solid rgba(232,96,60,0.3);
+      color: #e8603c;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 99px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -.02em;
+      margin-bottom: 10px;
+    }
+    h1 span {
+      background: linear-gradient(120deg, #e8603c, #f0a500);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .desc {
+      font-size: .9rem;
+      color: #7a7890;
+      line-height: 1.55;
+      margin-bottom: 28px;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .tag {
+      background: #13131a;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: .8rem;
+      color: #9896b0;
+    }
+
+    .code-block {
+      background: #13131a;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .code-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .code-top span { font-size: .72rem; color: #55536a; font-family: monospace; }
+
+    .copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(232,96,60,0.1);
+      border: 1px solid rgba(232,96,60,0.2);
+      color: #e8603c;
+      font-size: .78rem;
+      font-weight: 600;
+      padding: 5px 13px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .copy-btn:active { transform: scale(.96); }
+    .copy-btn.ok { color: #4caf82; border-color: rgba(76,175,130,0.3); background: rgba(76,175,130,0.1); }
+
+    pre {
+      padding: 14px 16px;
+      font-size: .78rem;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: #c4c2d8;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .links {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+    }
+    .links a {
+      font-size: .8rem;
+      color: #55536a;
+      text-decoration: none;
+    }
+    .links a:hover { color: #9896b0; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="badge">OpenClaw Skill</div>
+
+  <h1>AI 购物助手<br/><span>搜索 · 比价 · 扫码买</span></h1>
+
+  <p class="desc">说一句话或发一张图，自动在拼多多搜索商品并生成带二维码的购买卡片，微信直接扫码下单。</p>
+
+  <div class="tags">
+    <div class="tag">🔍 关键词搜索</div>
+    <div class="tag">🖼️ 图片识别</div>
+    <div class="tag">📲 微信卡片</div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-top">
+      <span>安装命令</span>
+      <button class="copy-btn" id="btn" onclick="copy()">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6z"/><path d="M2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1H9v1H2V6h1V5H2z"/></svg>
+        <span id="lbl">复制</span>
+      </button>
+    </div>
+    <pre id="cmd">mkdir -p ~/.openclaw/skills/homeglow_search
+curl -o ~/.openclaw/skills/homeglow_search/SKILL.md \
+  https://http://localhost:9000/SKILL.md</pre>
+  </div>
+
+  <div class="links">
+    <a href="https://github.com/ErogosZhou/openclaw-skill-homeglow" target="_blank">GitHub</a>
+    <a href="/SKILL.md" target="_blank">SKILL.md</a>
+    <a href="https://github.com/openclaw/openclaw" target="_blank">OpenClaw</a>
+  </div>
+</div>
+
+<script>
+function copy() {
+  const text = "mkdir -p ~/.openclaw/skills/homeglow_search\ncurl -o ~/.openclaw/skills/homeglow_search/SKILL.md http://localhost:9000/SKILL.md";
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('btn');
+    btn.classList.add('ok');
+    document.getElementById('lbl').textContent = '已复制';
+    setTimeout(() => { btn.classList.remove('ok'); document.getElementById('lbl').textContent = '复制'; }, 2000);
+  });
+}
+</script>
+</body>
+</html>

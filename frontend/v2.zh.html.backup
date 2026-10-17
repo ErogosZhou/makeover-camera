@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FDFCFB">
+    <title>换装相机 | 一键改造你的家</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- 中文字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cream': '#FDFCFB',
+                        'sage': '#4A5D4E',
+                        'sage-light': '#E8EDE9',
+                        'charcoal': '#1A1A1A',
+                        'terracotta': '#C27D63',
+                        'gold': '#B38B59'
+                    },
+                    fontFamily: {
+                        'sans': ['Noto Sans SC', 'sans-serif'],
+                        'serif': ['Noto Serif SC', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #FDFCFB; color: #1A1A1A; }
+
+        .upload-area {
+            border: 2px dashed #D1D5DB;
+            transition: all 0.3s ease;
+            background: #FFFFFF;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #4A5D4E;
+            background: #F8FAF8;
+        }
+
+        .btn-sage {
+            background-color: #4A5D4E;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-sage:hover { background-color: #3D4D41; }
+
+        .slider-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 8px;
+            /* 移动端限制最大高度，确保购物清单可见 */
+            max-height: 50vh;
+        }
+        .slider-img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
+        /* 桌面端恢复自动高度 */
+        @media (min-width: 768px) {
+            .slider-container {
+                max-height: none;
+            }
+            .slider-img {
+                height: auto;
+                object-fit: contain;
+            }
+        }
+        .slider-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        .slider-handle {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 3px; background: white;
+            cursor: ew-resize; z-index: 30;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .slider-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 44px; height: 44px;
+            background: white; border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234A5D4E' stroke-width='2'%3E%3Cpath d='M18 8l-6 6-6-6'/%3E%3Cpath d='M6 16l6-6 6 6'/%3E%3C/svg%3E");
+            background-position: center; background-repeat: no-repeat;
+        }
+
+        .style-chip {
+            transition: all 0.2s ease;
+        }
+        .style-chip.selected {
+            background-color: #4A5D4E;
+            color: white;
+        }
+
+        .fade-up {
+            animation: fadeUp 0.6s ease forwards;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+
+        /* 商品卡片动画 */
+        .grid > a {
+            animation: fadeInUp 0.5s ease forwards;
+            opacity: 0;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 流式物品滑入动画 */
+        .animate-slide-in {
+            animation: slideIn 0.4s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* 文字截断 */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* 商品卡片增强效果 */
+        .group:hover .group-hover\:scale-105 {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+    <div x-data="homeGlowV2()" x-init="init()" class="min-h-screen flex flex-col">
+
+        <!-- 导航栏 -->
+        <nav class="border-b border-gray-100 bg-white/90 backdrop-blur-md sticky top-0 z-50">
+            <div class="max-w-screen-xl mx-auto px-4 h-14 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-serif font-bold cursor-pointer" @click="step === 'results' ? null : reset()">换装相机<span class="text-sage">.</span></span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- 历史记录按钮 -->
+                    <button @click="toggleHistoryPanel()" class="text-gray-500 hover:text-sage transition-colors relative p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <template x-if="historyCount > 0">
+                            <span class="absolute top-0 right-0 w-4 h-4 bg-sage text-white text-[10px] rounded-full flex items-center justify-center" x-text="historyCount > 9 ? '9+' : historyCount"></span>
+                        </template>
+                    </button>
+                    <!-- 用户菜单 -->
+                    <div class="relative">
+                        <template x-if="!user">
+                            <button @click="showLoginModal = true" class="text-sm font-medium text-sage hover:text-charcoal transition-colors flex items-center gap-1 px-3 py-1.5 rounded-full border border-sage/30">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <span>登录</span>
+                            </button>
+                        </template>
+                        <template x-if="user">
+                            <button @click="showUserMenu = !showUserMenu" class="flex items-center gap-2">
+                                <img :src="user.avatar_url || 'https://via.placeholder.com/32'" class="w-8 h-8 rounded-full object-cover border-2 border-sage-light">
+                            </button>
+                        </template>
+                        <!-- 用户下拉菜单 -->
+                        <div x-show="showUserMenu" @click.away="showUserMenu = false" x-cloak
+                             class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-2 z-50">
+                            <div class="px-4 py-2 border-b border-gray-100">
+                                <p class="text-sm font-medium" x-text="user?.nickname"></p>
+                                <p class="text-xs text-gray-400">已生成 <span x-text="user?.total_generations || 0"></span> 个设计</p>
+                            </div>
+                            <button @click="showUserMenu = false; toggleHistoryPanel()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                我的记录
+                            </button>
+                            <button @click="showUserMenu = false; toggleHistoryPanel(); historyFavoritesOnly = true" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                                我的收藏
+                            </button>
+                            <hr class="my-2 border-gray-100">
+                            <button @click="logout()" class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                                退出登录
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 登录弹窗 -->
+        <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/50" @click="showLoginModal = false"></div>
+            <div class="relative bg-white rounded-2xl p-6 max-w-sm w-full space-y-5 shadow-xl">
+                <button @click="showLoginModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+                <div class="text-center space-y-2">
+                    <h3 class="text-xl font-serif font-bold">欢迎使用 换装相机</h3>
+                    <p class="text-sm text-gray-400">登录后可保存设计，随时查看</p>
+                </div>
+                <div class="space-y-3">
+                    <button @click="loginWithWechat()" class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#07C160] text-white rounded-lg hover:bg-[#06AD56] transition-colors">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.045c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89l-.002-.002zm-2.746 2.4c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.983.97-.983zm4.842 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.983.969-.983z"/></svg>
+                        <span class="font-medium">微信登录</span>
+                    </button>
+                    <div class="relative">
+                        <div class="absolute inset-0 flex items-center">
+                            <div class="w-full border-t border-gray-200"></div>
+                        </div>
+                        <div class="relative flex justify-center text-xs">
+                            <span class="bg-white px-2 text-gray-400">或</span>
+                        </div>
+                    </div>
+                    <button @click="continueAsGuest()" class="w-full text-center py-2 text-sm text-gray-500 hover:text-sage transition-colors">
+                        暂不登录，继续使用
+                    </button>
+                </div>
+                <p class="text-xs text-center text-gray-300">未登录时，设计记录仅保存在本设备</p>
+            </div>
+        </div>
+
+        <!-- 历史记录侧边栏 -->
+        <div x-show="showHistoryPanel" x-cloak class="fixed inset-0 z-[90]">
+            <div class="absolute inset-0 bg-black/30" @click="showHistoryPanel = false"></div>
+            <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl flex flex-col"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="translate-x-full"
+                 x-transition:enter-end="translate-x-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="translate-x-0"
+                 x-transition:leave-end="translate-x-full">
+                <!-- 头部 -->
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-lg font-serif font-bold">历史记录</h3>
+                        <div class="flex bg-gray-100 rounded-lg p-0.5">
+                            <button @click="historyFavoritesOnly = false"
+                                    :class="historyFavoritesOnly ? 'text-gray-500' : 'bg-white text-charcoal shadow-sm'"
+                                    class="px-3 py-1 text-xs font-medium rounded-md transition-all">全部</button>
+                            <button @click="historyFavoritesOnly = true"
+                                    :class="historyFavoritesOnly ? 'bg-white text-charcoal shadow-sm' : 'text-gray-500'"
+                                    class="px-3 py-1 text-xs font-medium rounded-md transition-all">收藏</button>
+                        </div>
+                    </div>
+                    <button @click="showHistoryPanel = false" class="text-gray-400 hover:text-gray-600 p-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                </div>
+                <!-- 列表 -->
+                <div class="flex-grow overflow-y-auto p-4 space-y-3">
+                    <template x-if="historyLoading">
+                        <div class="space-y-3">
+                            <template x-for="i in 3" :key="i">
+                                <div class="bg-gray-50 rounded-xl p-4 animate-pulse">
+                                    <div class="flex gap-4">
+                                        <div class="w-20 h-20 bg-gray-200 rounded-lg"></div>
+                                        <div class="flex-grow space-y-2">
+                                            <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+                                            <div class="h-3 bg-gray-200 rounded w-1/2"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="!historyLoading && historyItems.length === 0">
+                        <div class="text-center py-12">
+                            <div class="w-16 h-16 bg-sage-light rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-sage"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </div>
+                            <p class="text-gray-400" x-text="historyFavoritesOnly ? '暂无收藏' : '暂无记录'"></p>
+                            <p class="text-sm text-gray-300 mt-1">你的设计记录会显示在这里</p>
+                        </div>
+                    </template>
+                    <template x-if="!historyLoading && historyItems.length > 0">
+                        <div class="space-y-3">
+                            <template x-for="item in historyItems" :key="item.id">
+                                <div class="bg-gray-50 rounded-xl p-3 hover:bg-sage-light/30 transition-colors cursor-pointer group"
+                                     @click="loadHistoryItem(item)">
+                                    <div class="flex gap-3">
+                                        <div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                                            <img :src="getFullImageUrl(item.generated_image_url || item.original_image_url)" class="w-full h-full object-cover">
+                                            <button @click.stop="toggleFavorite(item)"
+                                                    class="absolute top-1 right-1 w-6 h-6 bg-white/80 rounded-full flex items-center justify-center">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                                     :fill="item.is_favorite ? '#C27D63' : 'none'"
+                                                     :stroke="item.is_favorite ? '#C27D63' : 'currentColor'" stroke-width="2">
+                                                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div class="flex-grow min-w-0">
+                                            <div class="flex items-start justify-between">
+                                                <div>
+                                                    <p class="text-sm font-medium" x-text="getStyleLabel(item.style)"></p>
+                                                    <p class="text-xs text-gray-400" x-text="getRoomLabel(item.room_type)"></p>
+                                                </div>
+                                                <button @click.stop="deleteHistoryItem(item)"
+                                                        class="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-gray-300 mt-2" x-text="formatDate(item.created_at)"></p>
+                                            <div class="flex items-center gap-2 mt-2">
+                                                <span class="text-xs bg-sage/10 text-sage px-2 py-0.5 rounded" x-text="getBudgetLabel(item.budget)"></span>
+                                                <template x-if="item.item_count > 0">
+                                                    <span class="text-xs text-gray-400" x-text="item.item_count + ' 件商品'"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <!-- 加载更多 -->
+                    <template x-if="!historyLoading && historyHasMore">
+                        <button @click="loadMoreHistory()" class="w-full py-3 text-sm text-sage hover:text-charcoal transition-colors">
+                            加载更多
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <main class="flex-grow max-w-screen-xl mx-auto px-4 w-full py-6">
+
+            <!-- 步骤1: 上传 -->
+            <section x-show="step === 'upload'" x-cloak class="max-w-xl mx-auto text-center space-y-6 py-12 fade-up">
+                <div class="space-y-3">
+                    <h1 class="text-3xl md:text-4xl font-serif font-bold leading-tight">
+                        一张照片<br>
+                        <span class="text-sage">看见家的另一种可能</span>
+                    </h1>
+                    <p class="text-gray-400 text-sm max-w-sm mx-auto">
+                        上传房间照片，AI 自动匹配风格，生成改造方案和购物清单
+                    </p>
+                </div>
+
+                <div class="upload-area relative rounded-2xl p-10 md:p-16 flex flex-col items-center justify-center cursor-pointer"
+                     @click="$refs.fileInput.click()"
+                     @dragover.prevent="dragover = true"
+                     @dragleave.prevent="dragover = false"
+                     @drop.prevent="handleDrop($event)"
+                     :class="{ 'dragover': dragover }">
+
+                    <input type="file" x-ref="fileInput" @change="handleFileSelect($event)" accept="image/jpeg,image/png,image/webp" class="hidden">
+
+                    <div class="space-y-4">
+                        <div class="w-16 h-16 bg-sage-light rounded-full flex items-center justify-center mx-auto text-sage">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        </div>
+                        <div class="space-y-1">
+                            <p class="text-base font-medium">点击或拖拽上传照片</p>
+                            <p class="text-xs text-gray-400">支持 JPG、PNG、WebP，最大 10MB</p>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-xs text-gray-300">无需选择，AI 全自动处理</p>
+            </section>
+
+            <!-- 步骤2: 处理中 -->
+            <section x-show="step === 'processing'" x-cloak class="max-w-2xl mx-auto pt-4 pb-16 fade-up">
+
+                <!-- 原图背景（模糊） -->
+                <div class="relative rounded-2xl overflow-hidden bg-gradient-to-br from-sage/5 to-sage-light/10" style="min-height: 500px;">
+
+                    <!-- 背景图片 -->
+                    <div x-show="uploadedImageUrl" class="absolute inset-0">
+                        <img :src="uploadedImageUrl" class="w-full h-full object-cover blur-md opacity-30" alt="原图">
+                        <div class="absolute inset-0 bg-gradient-to-b from-cream/90 via-cream/95 to-cream/90"></div>
+                    </div>
+
+                    <!-- 内容区 -->
+                    <div class="relative z-10 flex flex-col items-center justify-center text-center space-y-8 p-8">
+
+                        <!-- 主标题 -->
+                        <div class="space-y-2">
+                            <h3 class="text-2xl font-serif text-sage">AI 正在分析你的空间</h3>
+                            <p class="text-sm text-gray-500">专业设计师的工作流程</p>
+                        </div>
+
+                        <!-- AI 分析步骤列表 -->
+                        <div class="w-full max-w-md space-y-3">
+                            <template x-for="(step, index) in analysisSteps" :key="index">
+                                <div x-show="step.visible"
+                                     class="flex items-center gap-4 px-6 py-3 bg-white/60 backdrop-blur-sm rounded-xl border border-sage/10 transition-all duration-500"
+                                     :class="{ 'opacity-100': step.visible, 'opacity-0': !step.visible }"
+                                     style="animation: slideInLeft 0.5s ease-out;">
+
+                                    <!-- 图标 -->
+                                    <div class="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                                        <span x-show="step.completed" class="text-sage text-xl">✓</span>
+                                        <div x-show="!step.completed" class="w-4 h-4 rounded-full border-2 border-sage/30 border-t-sage animate-spin"></div>
+                                    </div>
+
+                                    <!-- 文字 -->
+                                    <div class="flex-grow text-left">
+                                        <p class="text-sm font-medium text-gray-700" x-text="step.text"></p>
+                                        <p x-show="step.desc" class="text-xs text-gray-500 mt-0.5" x-text="step.desc"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- 流式显示识别到的物品 -->
+                        <div x-show="streamingItems.length > 0" class="w-full max-w-md space-y-2 pt-4">
+                            <p class="text-xs text-gray-400 mb-3">已识别到的物品</p>
+                            <template x-for="item in streamingItems" :key="item.id">
+                                <div class="bg-sage-light/30 rounded-lg px-4 py-2.5 flex items-center gap-3 animate-slide-in">
+                                    <span class="text-xl" x-text="getCategoryIcon(item.category)"></span>
+                                    <span class="text-sm font-medium text-gray-700 flex-grow text-left" x-text="item.name"></span>
+                                    <span class="text-sage text-sm">✓</span>
+                                </div>
+                            </template>
+                        </div>
+
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- 步骤3: 结果展示 -->
+            <section x-show="step === 'results'" x-cloak class="max-w-4xl mx-auto space-y-8 fade-up">
+
+                <!-- 标题 -->
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl md:text-3xl font-serif font-bold">改造效果</h2>
+                    <div class="flex items-center gap-3">
+                        <template x-if="loadingProducts">
+                            <span class="text-xs text-sage flex items-center gap-1">
+                                <svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                正在匹配商品...
+                            </span>
+                        </template>
+                        <button @click="showStylePicker = !showStylePicker"
+                                class="text-xs font-medium text-sage hover:text-charcoal transition-colors flex items-center gap-1 px-3 py-1.5 rounded-full border border-sage/30">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                            换个风格
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 风格选择器 -->
+                <div x-show="showStylePicker" x-collapse class="bg-white border border-gray-100 rounded-xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-medium text-gray-600">选择风格</p>
+                        <button @click="showStylePicker = false" class="text-gray-400 hover:text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="s in styles" :key="s.value">
+                            <button @click="selectedStyle = s.value"
+                                    :class="{ 'selected': selectedStyle === s.value }"
+                                    class="style-chip px-3 py-1.5 rounded-full text-xs border border-gray-200 hover:border-sage">
+                                <span x-text="s.label"></span>
+                            </button>
+                        </template>
+                    </div>
+                    <button @click="regenerateWithStyle()"
+                            :disabled="regenerating"
+                            class="btn-sage w-full py-2.5 rounded-lg text-sm font-medium disabled:opacity-50">
+                        <span x-show="!regenerating">重新生成</span>
+                        <span x-show="regenerating" class="flex items-center justify-center gap-2">
+                            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            生成中...
+                        </span>
+                    </button>
+                </div>
+
+                <!-- 对比滑块 -->
+                <div class="slider-container" @mousemove="moveSlider($event)" @touchmove.prevent="moveSlider($event.touches[0])">
+                    <img :src="previewUrl" class="slider-img">
+                    <div class="slider-overlay z-10" :style="{ clipPath: `inset(0 0 0 ${sliderPos}%)` }">
+                        <img :src="generatedImageUrl" class="w-full h-full object-cover">
+                    </div>
+                    <div class="absolute bottom-3 left-3 z-20 bg-black/50 text-white px-2 py-1 rounded text-xs">改造前</div>
+                    <div class="absolute bottom-3 right-3 z-20 bg-sage/80 text-white px-2 py-1 rounded text-xs">改造后</div>
+                    <div class="slider-handle" :style="{ left: sliderPos + '%' }"></div>
+                </div>
+
+                <!-- 购物清单 -->
+                <div class="space-y-4 pt-6 border-t border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-serif font-bold">购物清单</h3>
+                        <template x-if="!loadingProducts && shoppingList.length > 0">
+                            <p class="text-base font-medium">预估总价: ¥<span x-text="totalPrice?.toFixed(0) || '0'"></span></p>
+                        </template>
+                    </div>
+
+                    <!-- 加载骨架 -->
+                    <template x-if="loadingProducts">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <template x-for="i in 4" :key="i">
+                                <div class="bg-white border border-gray-100 rounded-xl p-4 flex gap-3 animate-pulse">
+                                    <div class="w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0"></div>
+                                    <div class="flex-grow space-y-2">
+                                        <div class="h-3 bg-gray-200 rounded w-1/3"></div>
+                                        <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+                                        <div class="space-y-1.5">
+                                            <div class="h-10 bg-gray-100 rounded"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- 商品网格 - 电商风格双列大图 -->
+                    <template x-if="!loadingProducts">
+                        <div class="space-y-8">
+                            <template x-for="(item, idx) in shoppingList" :key="idx">
+                                <div class="space-y-3">
+                                    <!-- 分类标题 -->
+                                    <div class="flex items-center gap-2 px-1">
+                                        <span class="text-2xl" x-text="getCategoryIcon(item.identified_item.category)"></span>
+                                        <div>
+                                            <h3 class="font-medium text-gray-900" x-text="item.identified_item.name"></h3>
+                                            <p class="text-xs text-gray-500" x-text="item.identified_item.category"></p>
+                                        </div>
+                                    </div>
+
+                                    <!-- 商品网格 -->
+                                    <template x-if="item.matched_products && item.matched_products.length > 0">
+                                        <div class="grid grid-cols-2 gap-3 md:gap-4">
+                                            <template x-for="(product, pidx) in item.matched_products.slice(0, 4)" :key="product.id">
+                                                <a href="#"
+                                                   @click.prevent="openProductLink(product)"
+                                                   class="group bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-xl hover:border-sage/30 transition-all duration-300 flex flex-col"
+                                                   :style="`animation-delay: ${pidx * 50}ms`">
+
+                                                    <!-- 商品图片 -->
+                                                    <div class="relative aspect-square bg-gray-50 overflow-hidden">
+                                                        <img :src="product.image_url"
+                                                             :alt="product.name"
+                                                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                             onerror="this.src='https://via.placeholder.com/400?text=商品图片'">
+
+                                                        <!-- 销量标签 -->
+                                                        <template x-if="product.sales">
+                                                            <div class="absolute top-2 left-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                                                                <span x-text="`已售${product.sales > 10000 ? (product.sales/10000).toFixed(1) + '万' : product.sales}`"></span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+
+                                                    <!-- 商品信息 -->
+                                                    <div class="p-3 flex-grow flex flex-col">
+                                                        <!-- 商品名称 -->
+                                                        <h4 class="text-sm text-gray-800 line-clamp-2 leading-snug mb-2 group-hover:text-sage transition-colors"
+                                                            x-text="product.name"></h4>
+
+                                                        <!-- 店铺 -->
+                                                        <template x-if="product.shop_name">
+                                                            <p class="text-xs text-gray-400 mb-2 truncate" x-text="product.shop_name"></p>
+                                                        </template>
+
+                                                        <!-- 价格 -->
+                                                        <div class="mt-auto flex items-end justify-between">
+                                                            <div class="flex items-baseline gap-1.5">
+                                                                <span class="text-terracotta font-bold text-lg">¥</span>
+                                                                <span class="text-terracotta font-bold text-xl" x-text="product.price?.toFixed(0)"></span>
+                                                                <template x-if="product.original_price && product.original_price > product.price">
+                                                                    <span class="text-xs text-gray-400 line-through" x-text="`¥${product.original_price?.toFixed(0)}`"></span>
+                                                                </template>
+                                                            </div>
+
+                                                            <!-- 购买按钮 -->
+                                                            <div class="flex items-center gap-1 text-sage text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <span>立即购买</span>
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </a>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <!-- 无商品提示 -->
+                                    <template x-if="!item.matched_products || item.matched_products.length === 0">
+                                        <div class="text-center py-8 border border-dashed border-gray-200 rounded-xl">
+                                            <p class="text-sm text-gray-400">暂无匹配商品</p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- 空状态 -->
+                    <template x-if="!loadingProducts && shoppingList.length === 0">
+                        <p class="text-center text-gray-400 py-6 text-sm">暂未识别到可购买的商品</p>
+                    </template>
+                </div>
+
+                <!-- 重新开始 -->
+                <div class="text-center pt-6">
+                    <button @click="reset()" class="text-sm text-gray-400 hover:text-sage transition-colors">
+                        上传新照片，重新改造
+                    </button>
+                </div>
+            </section>
+
+            <!-- 错误状态 -->
+            <section x-show="step === 'error'" x-cloak class="max-w-sm mx-auto py-16 text-center space-y-5 fade-up">
+                <div class="w-14 h-14 bg-red-50 text-red-400 rounded-full flex items-center justify-center mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-lg font-serif font-bold">出错了</p>
+                    <p class="text-sm text-gray-400" x-text="errorMessage"></p>
+                </div>
+                <button @click="reset()" class="btn-sage px-6 py-2.5 rounded-lg text-sm font-medium">
+                    重试
+                </button>
+            </section>
+
+        </main>
+
+        <footer class="bg-charcoal text-white py-6 mt-auto">
+            <div class="max-w-screen-xl mx-auto px-4 text-center">
+                <p class="text-xs text-gray-500">换装相机 - 一键改造你的家</p>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        const BACKEND_URL = window.__HOMEGLOW_BACKEND_URL__ || localStorage.getItem('HOMEGLOW_BACKEND_URL') || '';
+        const API_BASE = (BACKEND_URL ? BACKEND_URL.replace(/\/$/, '') : '') + '/api/v1';
+
+        function getFullImageUrl(path) {
+            if (!path) return '';
+            if (path.startsWith('http')) return path;
+            return BACKEND_URL + (path.startsWith('/') ? '' : '/') + path;
+        }
+
+        function homeGlowV2() {
+            return {
+                step: 'upload',
+                dragover: false,
+                previewUrl: null,
+                imageId: null,
+                taskId: null,
+                uploadedImageUrl: null,  // 保存上传后的真实URL
+                statusMessage: '正在分析你的空间...',
+                subStatusMessage: '',
+                streamingItems: [],  // 流式显示的识别物品
+
+                // AI 分析步骤
+                analysisSteps: [
+                    { text: '上传成功', desc: '图片已接收', visible: false, completed: false, delay: 0 },
+                    { text: '识别房间布局', desc: '了解空间结构', visible: false, completed: false, delay: 2250 },
+                    { text: '分析光线条件', desc: '把握自然采光', visible: false, completed: false, delay: 4500 },
+                    { text: '理解现有风格', desc: '提取设计语言', visible: false, completed: false, delay: 6750 },
+                    { text: '构思设计方案', desc: '匹配最佳风格', visible: false, completed: false, delay: 9750 },
+                    { text: '绘制效果图', desc: 'AI 正在创作...', visible: false, completed: false, delay: 13500 }
+                ],
+                analysisTimer: null,
+
+                // 结果
+                generatedImageUrl: null,
+                shoppingList: [],
+                totalPrice: 0,
+                sliderPos: 50,
+                loadingProducts: false,
+
+                // 风格选择
+                showStylePicker: false,
+                selectedStyle: null,
+                regenerating: false,
+                styles: [
+                    { value: 'boho', label: '波西米亚' },
+                    { value: 'modern_minimalist', label: '现代简约' },
+                    { value: 'scandinavian', label: '北欧风' },
+                    { value: 'coastal', label: '海岸风' },
+                    { value: 'industrial', label: '工业风' },
+                    { value: 'japanese', label: '日式' },
+                    { value: 'vintage', label: '复古' },
+                    { value: 'chinese', label: '新中式' },
+                ],
+
+                errorMessage: '',
+
+                // 用户认证
+                user: null,
+                accessToken: null,
+                showLoginModal: false,
+                showUserMenu: false,
+
+                // 历史记录
+                showHistoryPanel: false,
+                historyItems: [],
+                historyCount: 0,
+                historyLoading: false,
+                historyFavoritesOnly: false,
+                historyPage: 1,
+                historyHasMore: false,
+
+                // 设备ID
+                deviceId: null,
+
+                init() {
+                    // 加载或生成设备ID
+                    this.deviceId = localStorage.getItem('homeglow_device_id');
+                    if (!this.deviceId) {
+                        this.deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                        localStorage.setItem('homeglow_device_id', this.deviceId);
+                    }
+
+                    // 加载已保存的token
+                    this.accessToken = localStorage.getItem('homeglow_token');
+                    if (this.accessToken) {
+                        this.fetchUserInfo();
+                    }
+
+                    // 加载历史记录数量
+                    this.loadHistoryCount();
+
+                    // 监听收藏切换
+                    this.$watch('historyFavoritesOnly', () => {
+                        if (this.showHistoryPanel) {
+                            this.historyPage = 1;
+                            this.loadHistory();
+                        }
+                    });
+                },
+
+                getAuthHeaders() {
+                    const headers = {
+                        'X-Device-ID': this.deviceId
+                    };
+                    if (this.accessToken) {
+                        headers['Authorization'] = `Bearer ${this.accessToken}`;
+                    }
+                    return headers;
+                },
+
+                async fetchUserInfo() {
+                    try {
+                        const res = await fetch(`${API_BASE}/auth/me`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            this.user = await res.json();
+                        } else {
+                            this.accessToken = null;
+                            localStorage.removeItem('homeglow_token');
+                        }
+                    } catch (e) {
+                        console.error('获取用户信息失败:', e);
+                    }
+                },
+
+                async loginWithWechat() {
+                    // 微信登录需要配置，暂时用测试登录
+                    try {
+                        const fd = new FormData();
+                        fd.append('nickname', '微信用户');
+                        const res = await fetch(`${API_BASE}/auth/dev-login`, {
+                            method: 'POST',
+                            body: fd
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.accessToken = data.access_token;
+                            localStorage.setItem('homeglow_token', data.access_token);
+                            await this.fetchUserInfo();
+                            this.showLoginModal = false;
+                            await this.syncLocalHistory();
+                            this.loadHistory();
+                        } else {
+                            const err = await res.json();
+                            alert(err.detail || '登录失败');
+                        }
+                    } catch (e) {
+                        alert('登录失败: ' + e.message);
+                    }
+                },
+
+                continueAsGuest() {
+                    this.showLoginModal = false;
+                },
+
+                async logout() {
+                    this.user = null;
+                    this.accessToken = null;
+                    localStorage.removeItem('homeglow_token');
+                    this.showUserMenu = false;
+                    this.historyItems = [];
+                    this.loadHistoryCount();
+                },
+
+                async syncLocalHistory() {
+                    const localHistory = JSON.parse(localStorage.getItem('homeglow_local_history') || '[]');
+                    if (localHistory.length > 0 && this.accessToken) {
+                        try {
+                            await fetch(`${API_BASE}/history/sync`, {
+                                method: 'POST',
+                                headers: {
+                                    ...this.getAuthHeaders(),
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(localHistory)
+                            });
+                            localStorage.removeItem('homeglow_local_history');
+                        } catch (e) {
+                            console.error('同步历史记录失败:', e);
+                        }
+                    }
+                },
+
+                toggleHistoryPanel() {
+                    this.showHistoryPanel = !this.showHistoryPanel;
+                    if (this.showHistoryPanel) {
+                        this.historyPage = 1;
+                        this.loadHistory();
+                    }
+                },
+
+                async loadHistoryCount() {
+                    try {
+                        const res = await fetch(`${API_BASE}/history?page=1&page_size=1`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.historyCount = data.total;
+                        }
+                    } catch (e) {
+                        console.error('加载历史记录数量失败:', e);
+                    }
+                },
+
+                async loadHistory() {
+                    this.historyLoading = true;
+                    try {
+                        const params = new URLSearchParams({
+                            page: this.historyPage,
+                            page_size: 10,
+                            favorites_only: this.historyFavoritesOnly
+                        });
+                        const res = await fetch(`${API_BASE}/history?${params}`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.historyItems = data.items;
+                            this.historyHasMore = data.has_more;
+                            this.historyCount = data.total;
+                        }
+                    } catch (e) {
+                        console.error('加载历史记录失败:', e);
+                    } finally {
+                        this.historyLoading = false;
+                    }
+                },
+
+                async loadMoreHistory() {
+                    this.historyPage++;
+                    try {
+                        const params = new URLSearchParams({
+                            page: this.historyPage,
+                            page_size: 10,
+                            favorites_only: this.historyFavoritesOnly
+                        });
+                        const res = await fetch(`${API_BASE}/history?${params}`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.historyItems = [...this.historyItems, ...data.items];
+                            this.historyHasMore = data.has_more;
+                        }
+                    } catch (e) {
+                        console.error('加载更多失败:', e);
+                    }
+                },
+
+                async loadHistoryItem(item) {
+                    try {
+                        const res = await fetch(`${API_BASE}/history/${item.id}`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const detail = await res.json();
+                            this.previewUrl = getFullImageUrl(detail.original_image_url);
+                            this.generatedImageUrl = getFullImageUrl(detail.generated_image_url);
+                            this.shoppingList = detail.shopping_list || [];
+                            this.totalPrice = detail.total_price || 0;
+                            this.loadingProducts = false;
+                            this.step = 'results';
+                            this.showHistoryPanel = false;
+                        }
+                    } catch (e) {
+                        console.error('加载历史详情失败:', e);
+                    }
+                },
+
+                async toggleFavorite(item) {
+                    try {
+                        const res = await fetch(`${API_BASE}/history/${item.id}/favorite`, {
+                            method: 'POST',
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            item.is_favorite = data.is_favorite;
+                            if (this.historyFavoritesOnly && !item.is_favorite) {
+                                this.historyItems = this.historyItems.filter(i => i.id !== item.id);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('切换收藏失败:', e);
+                    }
+                },
+
+                async deleteHistoryItem(item) {
+                    if (!confirm('确定删除这条记录吗？')) return;
+                    try {
+                        const res = await fetch(`${API_BASE}/history/${item.id}`, {
+                            method: 'DELETE',
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            this.historyItems = this.historyItems.filter(i => i.id !== item.id);
+                            this.historyCount--;
+                        }
+                    } catch (e) {
+                        console.error('删除失败:', e);
+                    }
+                },
+
+                // 标签转换
+                getStyleLabel(value) {
+                    const map = {
+                        'boho': '波西米亚',
+                        'modern_minimalist': '现代简约',
+                        'scandinavian': '北欧风',
+                        'coastal': '海岸风',
+                        'industrial': '工业风',
+                        'japanese': '日式',
+                        'vintage': '复古',
+                        'chinese': '新中式',
+                        'auto': '自动匹配'
+                    };
+                    return map[value] || value;
+                },
+
+                getRoomLabel(value) {
+                    const map = {
+                        'living_room': '客厅',
+                        'bedroom': '卧室',
+                        'kitchen': '厨房',
+                        'bathroom': '卫生间',
+                        'dining_room': '餐厅',
+                        'office': '书房',
+                        'room': '房间'
+                    };
+                    return map[value] || value;
+                },
+
+                getBudgetLabel(value) {
+                    const map = {
+                        'low': '经济型',
+                        'medium': '中档',
+                        'high': '高端'
+                    };
+                    return map[value] || value;
+                },
+
+                formatDate(dateStr) {
+                    const date = new Date(dateStr);
+                    const now = new Date();
+                    const diff = now - date;
+                    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    if (days === 0) return '今天';
+                    if (days === 1) return '昨天';
+                    if (days < 7) return `${days}天前`;
+                    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+                },
+
+                async saveToHistory(result) {
+                    try {
+                        const historyData = {
+                            original_image_url: this.uploadedImageUrl || this.previewUrl,
+                            room_type: result.detected_room_type || 'room',
+                            style: result.applied_style || 'auto',
+                            budget: result.budget || 'medium',
+                            generated_image_url: result.generated_image_url,
+                            shopping_list: result.shopping_list,
+                            total_price: result.total_estimated_price
+                        };
+
+                        const res = await fetch(`${API_BASE}/history`, {
+                            method: 'POST',
+                            headers: {
+                                ...this.getAuthHeaders(),
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(historyData)
+                        });
+
+                        if (res.ok) {
+                            this.historyCount++;
+                        } else if (!this.accessToken) {
+                            const localHistory = JSON.parse(localStorage.getItem('homeglow_local_history') || '[]');
+                            localHistory.unshift(historyData);
+                            localStorage.setItem('homeglow_local_history', JSON.stringify(localHistory.slice(0, 50)));
+                        }
+                    } catch (e) {
+                        console.error('保存历史记录失败:', e);
+                    }
+                },
+
+                // 启动分析步骤动画
+                startAnalysisSteps() {
+                    // 清除之前的定时器
+                    if (this.analysisTimer) {
+                        clearTimeout(this.analysisTimer);
+                    }
+
+                    // 重置所有步骤
+                    this.analysisSteps.forEach(step => {
+                        step.visible = false;
+                        step.completed = false;
+                    });
+
+                    // 逐步显示每个步骤
+                    this.analysisSteps.forEach((step, index) => {
+                        setTimeout(() => {
+                            step.visible = true;
+
+                            // 前面的步骤标记为完成
+                            if (index > 0) {
+                                this.analysisSteps[index - 1].completed = true;
+                            }
+                        }, step.delay);
+                    });
+                },
+
+                // 停止并清理分析步骤
+                stopAnalysisSteps() {
+                    if (this.analysisTimer) {
+                        clearTimeout(this.analysisTimer);
+                        this.analysisTimer = null;
+                    }
+                    // 标记所有可见的步骤为完成
+                    this.analysisSteps.forEach(step => {
+                        if (step.visible) {
+                            step.completed = true;
+                        }
+                    });
+                },
+
+                handleFileSelect(e) {
+                    if (e.target.files[0]) this.processFile(e.target.files[0]);
+                },
+
+                handleDrop(e) {
+                    this.dragover = false;
+                    if (e.dataTransfer.files[0]) this.processFile(e.dataTransfer.files[0]);
+                },
+
+                processFile(file) {
+                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                        alert('请上传 JPG、PNG 或 WebP 格式的图片');
+                        return;
+                    }
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('图片大小不能超过 10MB');
+                        return;
+                    }
+                    this.previewUrl = URL.createObjectURL(file);
+                    this.uploadAndTransform(file);
+                },
+
+                async uploadAndTransform(file) {
+                    this.step = 'processing';
+                    this.statusMessage = '正在上传你的照片...';
+                    this.subStatusMessage = '分析空间布局和光线条件';
+                    this.streamingItems = [];
+
+                    // ✨ 启动分析步骤动画
+                    this.startAnalysisSteps();
+
+                    try {
+                        // 上传
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        const uploadRes = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+
+                        if (!uploadRes.ok) {
+                            const err = await uploadRes.json();
+                            throw new Error(err.detail || '上传失败');
+                        }
+
+                        const uploadData = await uploadRes.json();
+                        this.imageId = uploadData.image_id;
+                        this.uploadedImageUrl = uploadData.image_url;  // 保存服务器返回的URL
+
+                        // 开始转换
+                        this.statusMessage = 'AI 正在创作你的专属方案...';
+                        this.subStatusMessage = '理解你的设计需求';
+
+                        const transformFd = new FormData();
+                        transformFd.append('image_id', this.imageId);
+                        transformFd.append('lang', 'zh');
+
+                        const transformRes = await fetch(`${API_BASE}/v2/transform`, { method: 'POST', body: transformFd });
+
+                        if (!transformRes.ok) {
+                            const err = await transformRes.json();
+                            throw new Error(err.detail || '转换失败');
+                        }
+
+                        const transformData = await transformRes.json();
+                        this.taskId = transformData.task_id;
+
+                        // 轮询结果
+                        this.pollTaskStatus();
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                        // 出错时停止分析步骤
+                        this.stopAnalysisSteps();
+                    }
+                },
+
+                async pollTaskStatus() {
+                    if (!this.taskId) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/task/${this.taskId}`);
+                        if (!res.ok) throw new Error('获取状态失败');
+
+                        const data = await res.json();
+
+                        // 调试日志
+                        console.log('📊 当前状态:', data.status, '文案应该是:', data.status);
+
+                        // 情境化文案配置
+                        const stageConfig = {
+                            'pending': {
+                                message: '正在准备创作...',
+                                sub: '分析空间特征'
+                            },
+                            'generating': {
+                                message: 'AI 正在绘制效果图...',
+                                sub: '匹配风格和色彩方案'
+                            },
+                            'identifying': {
+                                message: '正在识别软装物品...',
+                                sub: '逐个分析家具和装饰'
+                            },
+                            'matching': {
+                                message: '正在为你寻找商品...',
+                                sub: '从海量商品中精选匹配'
+                            }
+                        };
+
+                        const config = stageConfig[data.status] || { message: '处理中...', sub: '' };
+                        this.statusMessage = config.message;
+                        this.subStatusMessage = config.sub;
+
+                        console.log('✍️ 更新文案:', this.statusMessage, '/', this.subStatusMessage);
+
+                        // 流式显示识别到的物品
+                        if (data.status === 'identifying' && data.result?.shopping_list) {
+                            const newItems = data.result.shopping_list.map(item => item.identified_item);
+                            // 只添加新识别到的物品
+                            newItems.forEach(newItem => {
+                                if (!this.streamingItems.find(item => item.id === newItem.id)) {
+                                    this.streamingItems.push(newItem);
+                                }
+                            });
+                        }
+
+                        // 图片生成后立即展示
+                        if ((data.status === 'identifying' || data.status === 'matching') && data.result?.generated_image_url) {
+                            if (this.step !== 'results') {
+                                this.generatedImageUrl = getFullImageUrl(data.result.generated_image_url);
+                                this.loadingProducts = true;
+                                this.shoppingList = [];
+                                this.step = 'results';
+                                // ✨ 停止分析步骤动画
+                                this.stopAnalysisSteps();
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                            setTimeout(() => this.pollTaskStatus(), 2000);
+                        } else if (data.status === 'completed') {
+                            this.handleResults(data.result);
+                        } else if (data.status === 'failed') {
+                            throw new Error(data.message || '生成失败');
+                        } else {
+                            setTimeout(() => this.pollTaskStatus(), 2000);
+                        }
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                        // ✨ 出错时停止分析步骤
+                        this.stopAnalysisSteps();
+                    }
+                },
+
+                handleResults(result) {
+                    this.generatedImageUrl = getFullImageUrl(result.generated_image_url);
+                    this.shoppingList = result.shopping_list || [];
+                    this.totalPrice = result.total_estimated_price || 0;
+                    this.loadingProducts = false;
+
+                    const wasNotResults = this.step !== 'results';
+                    this.step = 'results';
+                    // ✨ 停止分析步骤动画
+                    this.stopAnalysisSteps();
+
+                    if (wasNotResults) {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+
+                    this.saveToHistory(result);
+                },
+
+                async regenerateWithStyle() {
+                    if (!this.selectedStyle || !this.imageId) return;
+
+                    this.regenerating = true;
+                    this.showStylePicker = false;
+                    this.step = 'processing';
+                    this.statusMessage = `正在用${this.getStyleLabel(this.selectedStyle)}风格重新设计...`;
+                    this.subStatusMessage = '理解你的设计需求';
+                    this.streamingItems = [];
+                    this.loadingProducts = false;
+                    this.shoppingList = [];
+
+                    try {
+                        const fd = new FormData();
+                        fd.append('image_id', this.imageId);
+                        fd.append('style', this.selectedStyle);
+                        fd.append('lang', 'zh');
+
+                        const res = await fetch(`${API_BASE}/v2/transform/override`, { method: 'POST', body: fd });
+
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.detail || '重新生成失败');
+                        }
+
+                        const data = await res.json();
+                        this.taskId = data.task_id;
+                        this.pollTaskStatus();
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    } finally {
+                        this.regenerating = false;
+                    }
+                },
+
+                moveSlider(e) {
+                    if (this.step !== 'results') return;
+                    const container = document.querySelector('.slider-container');
+                    if (!container) return;
+                    const rect = container.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    this.sliderPos = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                },
+
+                getCategoryIcon(category) {
+                    const icons = {
+                        '纺织品': '🛋️', '灯具': '💡', '植物': '🌿',
+                        '墙饰': '🖼️', '装饰': '📚', '地毯': '🟫', '家具': '🪑',
+                        'Textiles': '🛋️', 'Lighting': '💡', 'Plants': '🌿',
+                        'Wall Decor': '🖼️', 'Decor': '📚', 'Rug': '🟫', 'Furniture': '🪑'
+                    };
+                    return icons[category] || '📦';
+                },
+
+                async openProductLink(product) {
+                    // 点击时生成推广链接
+                    console.log('点击商品:', product.name, 'ID:', product.id);
+
+                    // 🔑 关键：在用户点击时立即同步打开窗口（不会被Safari/微信拦截）
+                    const newWindow = window.open('about:blank', '_blank');
+
+                    // 如果窗口打开失败（极端情况）
+                    if (!newWindow) {
+                        alert('无法打开新窗口，请检查浏览器弹窗设置');
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/product/generate-link`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                goods_sign: product.id,
+                                platform: product.platform || 'pdd'
+                            })
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            console.log('生成推广链接:', data.url);
+                            // 更新已打开窗口的URL
+                            newWindow.location.href = data.url;
+                        } else {
+                            console.error('API返回错误:', res.status);
+                            // 降级：直接跳转到原链接
+                            if (product.affiliate_link) {
+                                newWindow.location.href = product.affiliate_link;
+                            } else {
+                                newWindow.close();
+                                alert('获取商品链接失败');
+                            }
+                        }
+                    } catch (e) {
+                        console.error('生成推广链接失败:', e);
+                        // 降级：直接跳转到原链接
+                        if (product.affiliate_link) {
+                            newWindow.location.href = product.affiliate_link;
+                        } else {
+                            newWindow.close();
+                            alert('获取商品链接失败');
+                        }
+                    }
+                },
+
+                reset() {
+                    this.step = 'upload';
+                    this.previewUrl = null;
+                    this.imageId = null;
+                    this.taskId = null;
+                    this.uploadedImageUrl = null;
+                    this.generatedImageUrl = null;
+                    this.streamingItems = [];
+                    this.shoppingList = [];
+                    this.totalPrice = 0;
+                    this.sliderPos = 50;
+                    this.loadingProducts = false;
+                    this.showStylePicker = false;
+                    this.selectedStyle = null;
+                    this.errorMessage = '';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            };
+        }
+    </script>
+</body>
+</html>

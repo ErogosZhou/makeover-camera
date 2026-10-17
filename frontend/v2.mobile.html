@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>换装相机 - AI家居设计</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* 上传区域 */
+        .upload-container {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        .upload-container.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .upload-box {
+            width: 280px;
+            height: 280px;
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+        }
+
+        .upload-box:active {
+            transform: scale(0.95);
+        }
+
+        .upload-icon {
+            font-size: 60px;
+            opacity: 0.6;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 20px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* 全屏动画容器 */
+        .fullscreen-animation {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .fullscreen-animation.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 背景图片层 */
+        .background-image {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            transform: scale(0.3);
+            transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .fullscreen-animation.active .background-image {
+            transform: scale(1);
+        }
+
+        /* 毛玻璃层 */
+        .glass-overlay {
+            position: absolute;
+            inset: 0;
+            backdrop-filter: blur(0px) brightness(0.8);
+            -webkit-backdrop-filter: blur(0px) brightness(0.8);
+            background: linear-gradient(
+                135deg,
+                rgba(255,255,255,0) 0%,
+                rgba(255,255,255,0.05) 50%,
+                rgba(255,255,255,0) 100%
+            );
+            transition: backdrop-filter 1.5s ease 1.2s, -webkit-backdrop-filter 1.5s ease 1.2s;
+        }
+
+        .fullscreen-animation.glass-active .glass-overlay {
+            backdrop-filter: blur(60px) brightness(0.6);
+            -webkit-backdrop-filter: blur(60px) brightness(0.6);
+        }
+
+        /* 提示词容器 */
+        .prompt-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 40px;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            z-index: 2;
+        }
+
+        .prompt-container.visible {
+            opacity: 1;
+        }
+
+        .prompt-container.fade-out {
+            opacity: 0;
+            transition: opacity 1.5s ease;
+        }
+
+        /* 提示词行（仿Apple Music歌词）*/
+        .prompt-line {
+            font-size: 22px;
+            font-weight: 500;
+            line-height: 1.6;
+            color: rgba(255,255,255,0.95);
+            text-align: center;
+            margin: 8px 0;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: lyricFadeIn 0.6s ease forwards;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+            letter-spacing: 0.5px;
+        }
+
+        @keyframes lyricFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 重点词高亮 */
+        .prompt-line.highlight {
+            font-size: 26px;
+            font-weight: 600;
+            color: #fff;
+            text-shadow: 0 0 30px rgba(255,255,255,0.5);
+        }
+
+        /* 加载指示器 */
+        .loading-indicator {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.6);
+            animation: loadingPulse 1.5s ease-in-out infinite;
+        }
+
+        .loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes loadingPulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* 结果展示 */
+        .result-container {
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s ease;
+        }
+
+        .result-container.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .result-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* 底部操作栏 */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(100%);
+            transition: all 0.5s ease;
+        }
+
+        .bottom-bar.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .bottom-button {
+            padding: 14px 28px;
+            border-radius: 25px;
+            border: none;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .bottom-button.primary {
+            background: rgba(255,255,255,0.95);
+            color: #000;
+        }
+
+        .bottom-button.secondary {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .bottom-button:active {
+            transform: scale(0.95);
+        }
+
+        /* 毛玻璃清晰动画 */
+        .glass-overlay.clear {
+            backdrop-filter: blur(0px) brightness(1);
+            -webkit-backdrop-filter: blur(0px) brightness(1);
+            opacity: 0;
+            transition: all 2s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- 上传界面 -->
+    <div class="upload-container" id="uploadContainer">
+        <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📸</div>
+            <div class="upload-text">点击上传房间照片</div>
+        </div>
+        <div class="upload-hint">支持 JPG、PNG 格式</div>
+        <input type="file" id="fileInput" accept="image/*" capture="environment">
+    </div>
+
+    <!-- 全屏动画 -->
+    <div class="fullscreen-animation" id="fullscreenAnimation">
+        <div class="background-image" id="backgroundImage"></div>
+        <div class="glass-overlay" id="glassOverlay"></div>
+
+        <!-- 提示词容器 -->
+        <div class="prompt-container" id="promptContainer">
+            <div id="promptLines"></div>
+        </div>
+
+        <!-- 加载指示器 -->
+        <div class="loading-indicator">
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+            <div class="loading-dot"></div>
+        </div>
+    </div>
+
+    <!-- 结果展示 -->
+    <div class="result-container" id="resultContainer">
+        <img class="result-image" id="resultImage" alt="生成结果">
+    </div>
+
+    <!-- 底部操作栏 -->
+    <div class="bottom-bar" id="bottomBar">
+        <button class="bottom-button secondary" onclick="resetApp()">重新设计</button>
+        <button class="bottom-button primary" onclick="viewProducts()">查看商品</button>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        let currentTaskId = null;
+        let pollingInterval = null;
+
+        // 文件上传
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 读取图片预览
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                startAnimation(event.target.result, file);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        async function startAnimation(imageDataUrl, file) {
+            // 1. 隐藏上传界面
+            document.getElementById('uploadContainer').classList.add('hidden');
+
+            // 2. 显示全屏动画，设置背景图
+            const animation = document.getElementById('fullscreenAnimation');
+            const backgroundImage = document.getElementById('backgroundImage');
+            backgroundImage.style.backgroundImage = `url(${imageDataUrl})`;
+            animation.classList.add('active');
+
+            // 3. 1.2秒后开始毛玻璃效果
+            setTimeout(() => {
+                animation.classList.add('glass-active');
+            }, 1200);
+
+            // 4. 上传图片到服务器
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const uploadRes = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+
+                if (!uploadData.success) {
+                    alert('上传失败，请重试');
+                    resetApp();
+                    return;
+                }
+
+                // 5. 触发V2生成
+                const transformFormData = new FormData();
+                transformFormData.append('image_id', uploadData.image_id);
+                transformFormData.append('lang', 'zh');
+
+                const transformRes = await fetch(`${API_BASE}/v2/transform`, {
+                    method: 'POST',
+                    body: transformFormData
+                });
+                const transformData = await transformRes.json();
+                currentTaskId = transformData.task_id;
+
+                // 6. 开始轮询任务状态
+                startPolling();
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('处理失败，请重试');
+                resetApp();
+            }
+        }
+
+        function startPolling() {
+            pollingInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/task/${currentTaskId}`);
+                    const data = await res.json();
+
+                    // 显示提示词（打字机效果）
+                    if (data.result?.generation_prompt) {
+                        displayPrompt(data.result.generation_prompt);
+                    }
+
+                    // 如果生成完成
+                    if (data.status === 'completed' && data.result?.generated_image_url) {
+                        clearInterval(pollingInterval);
+                        showResult(data.result.generated_image_url);
+                    }
+
+                    // 如果失败
+                    if (data.status === 'failed') {
+                        clearInterval(pollingInterval);
+                        alert('生成失败: ' + (data.result?.error_message || '未知错误'));
+                        resetApp();
+                    }
+
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 1000);
+        }
+
+        let promptDisplayed = false;
+
+        function displayPrompt(promptText) {
+            if (promptDisplayed) return;
+            promptDisplayed = true;
+
+            const container = document.getElementById('promptContainer');
+            const linesDiv = document.getElementById('promptLines');
+
+            // 2.7秒后显示提示词容器
+            setTimeout(() => {
+                container.classList.add('visible');
+            }, 2700);
+
+            // 按标点符号分割
+            const lines = promptText.split(/([，。、；！？,.\n]+)/).filter(Boolean);
+            let currentLine = '';
+            let lineIndex = 0;
+            let charIndex = 0;
+
+            function typeNextChar() {
+                if (lineIndex >= lines.length) return;
+
+                const segment = lines[lineIndex];
+
+                // 如果是标点符号，加入当前行并换行
+                if (/[，。、；！？,.\n]+/.test(segment)) {
+                    currentLine += segment;
+                    addLine(currentLine);
+                    currentLine = '';
+                    lineIndex++;
+                    setTimeout(typeNextChar, 400); // 标点后停顿
+                } else {
+                    // 逐字添加
+                    if (charIndex < segment.length) {
+                        currentLine += segment[charIndex];
+                        charIndex++;
+                        setTimeout(typeNextChar, 50); // 打字速度
+                    } else {
+                        // 当前段落打完
+                        lineIndex++;
+                        charIndex = 0;
+                        setTimeout(typeNextChar, 100);
+                    }
+                }
+            }
+
+            function addLine(text) {
+                const line = document.createElement('div');
+                line.className = 'prompt-line';
+
+                // 重点行高亮（包含【】或风格名称）
+                if (text.includes('【') || text.includes('风') || text.includes('MUJI')) {
+                    line.classList.add('highlight');
+                }
+
+                line.textContent = text.trim();
+                linesDiv.appendChild(line);
+
+                // 自动滚动到最新行
+                setTimeout(() => {
+                    line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+
+            // 3秒后开始打字机效果
+            setTimeout(() => {
+                typeNextChar();
+            }, 3000);
+        }
+
+        function showResult(imageUrl) {
+            const fullImageUrl = imageUrl.startsWith('http')
+                ? imageUrl
+                : `http://localhost:8000${imageUrl}`;
+
+            // 1. 提示词消散
+            const promptContainer = document.getElementById('promptContainer');
+            promptContainer.classList.add('fade-out');
+
+            setTimeout(() => {
+                // 2. 毛玻璃变清晰
+                const glassOverlay = document.getElementById('glassOverlay');
+                glassOverlay.classList.add('clear');
+
+                // 3. 显示结果图片
+                const resultContainer = document.getElementById('resultContainer');
+                const resultImage = document.getElementById('resultImage');
+                resultImage.src = fullImageUrl;
+
+                setTimeout(() => {
+                    resultContainer.classList.add('visible');
+
+                    // 4. 显示底部操作栏
+                    setTimeout(() => {
+                        document.getElementById('bottomBar').classList.add('visible');
+                    }, 500);
+                }, 1000);
+
+            }, 1500);
+        }
+
+        function resetApp() {
+            // 清理所有状态
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+
+            promptDisplayed = false;
+            currentTaskId = null;
+
+            // 重置所有元素
+            document.getElementById('uploadContainer').classList.remove('hidden');
+            document.getElementById('fullscreenAnimation').classList.remove('active', 'glass-active');
+            document.getElementById('glassOverlay').classList.remove('clear');
+            document.getElementById('promptContainer').classList.remove('visible', 'fade-out');
+            document.getElementById('promptLines').innerHTML = '';
+            document.getElementById('resultContainer').classList.remove('visible');
+            document.getElementById('bottomBar').classList.remove('visible');
+            document.getElementById('fileInput').value = '';
+        }
+
+        function viewProducts() {
+            if (!currentTaskId) return;
+            // 跳转到商品列表页面（可以后续实现）
+            alert('商品列表功能开发中...');
+        }
+    </script>
+</body>
+</html>

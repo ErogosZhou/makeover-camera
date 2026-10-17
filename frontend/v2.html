@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FDFCFB">
+    <title>Makeover Camera | One-Tap Room Transformation</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cream': '#FDFCFB',
+                        'sage': '#4A5D4E',
+                        'sage-light': '#E8EDE9',
+                        'charcoal': '#1A1A1A',
+                        'terracotta': '#C27D63',
+                        'gold': '#B38B59'
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'sans-serif'],
+                        'serif': ['Playfair Display', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #FDFCFB; color: #1A1A1A; }
+        .serif-italic { font-family: 'Playfair Display', serif; font-style: italic; }
+
+        .upload-area {
+            border: 2px dashed #D1D5DB;
+            transition: all 0.3s ease;
+            background: #FFFFFF;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #4A5D4E;
+            background: #F8FAF8;
+        }
+
+        .btn-sage {
+            background-color: #4A5D4E;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .btn-sage:hover { background-color: #3D4D41; }
+
+        .slider-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+        .slider-img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .slider-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        .slider-handle {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 3px; background: white;
+            cursor: ew-resize; z-index: 30;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        .slider-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 44px; height: 44px;
+            background: white; border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%234A5D4E' stroke-width='2'%3E%3Cpath d='M18 8l-6 6-6-6'/%3E%3Cpath d='M6 16l6-6 6 6'/%3E%3C/svg%3E");
+            background-position: center; background-repeat: no-repeat;
+        }
+
+        .style-chip {
+            transition: all 0.2s ease;
+        }
+        .style-chip.selected {
+            background-color: #4A5D4E;
+            color: white;
+        }
+
+        .fade-up {
+            animation: fadeUp 0.6s ease forwards;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse-ring {
+            animation: pulseRing 2s ease infinite;
+        }
+        @keyframes pulseRing {
+            0% { transform: scale(0.9); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.5; }
+            100% { transform: scale(0.9); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="font-sans antialiased">
+    <div x-data="homeGlowV2()" x-init="init()" class="min-h-screen flex flex-col">
+
+        <!-- Navigation -->
+        <nav class="border-b border-gray-100 bg-white/90 backdrop-blur-md sticky top-0 z-50">
+            <div class="max-w-screen-xl mx-auto px-6 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-serif font-bold cursor-pointer" @click="step === 'results' ? null : reset()">Makeover Camera<span class="text-sage">.</span></span>
+                    <span class="text-[9px] uppercase tracking-widest text-gray-400 font-semibold hidden sm:block">v2</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- History Button -->
+                    <button @click="toggleHistoryPanel()" class="text-gray-500 hover:text-sage transition-colors relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <template x-if="historyCount > 0">
+                            <span class="absolute -top-1 -right-1 w-4 h-4 bg-sage text-white text-[10px] rounded-full flex items-center justify-center" x-text="historyCount > 9 ? '9+' : historyCount"></span>
+                        </template>
+                    </button>
+                    <!-- User Menu -->
+                    <div class="relative">
+                        <template x-if="!user">
+                            <button @click="showLoginModal = true" class="text-sm font-medium text-sage hover:text-charcoal transition-colors flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <span class="hidden sm:inline">Sign in</span>
+                            </button>
+                        </template>
+                        <template x-if="user">
+                            <button @click="showUserMenu = !showUserMenu" class="flex items-center gap-2">
+                                <img :src="user.avatar_url || 'https://via.placeholder.com/32'" class="w-8 h-8 rounded-full object-cover border-2 border-sage-light">
+                                <span class="text-sm font-medium hidden sm:inline" x-text="user.nickname"></span>
+                            </button>
+                        </template>
+                        <!-- User Dropdown -->
+                        <div x-show="showUserMenu" @click.away="showUserMenu = false" x-cloak
+                             class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-2 z-50">
+                            <div class="px-4 py-2 border-b border-gray-100">
+                                <p class="text-sm font-medium" x-text="user?.nickname"></p>
+                                <p class="text-xs text-gray-400"><span x-text="user?.total_generations || 0"></span> designs created</p>
+                            </div>
+                            <button @click="showUserMenu = false; toggleHistoryPanel()" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                My History
+                            </button>
+                            <button @click="showUserMenu = false; toggleHistoryPanel(); historyFavoritesOnly = true" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                                Favorites
+                            </button>
+                            <hr class="my-2 border-gray-100">
+                            <button @click="logout()" class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                                Sign out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Login Modal -->
+        <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/50" @click="showLoginModal = false"></div>
+            <div class="relative bg-white rounded-2xl p-8 max-w-sm w-full space-y-6 shadow-xl">
+                <button @click="showLoginModal = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+                <div class="text-center space-y-2">
+                    <h3 class="text-2xl font-serif">Welcome to Makeover Camera</h3>
+                    <p class="text-sm text-gray-400">Sign in to save your designs and access them anywhere</p>
+                </div>
+                <div class="space-y-3">
+                    <button @click="loginWithGoogle()" class="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                        <span class="text-sm font-medium">Continue with Google</span>
+                    </button>
+                    <button @click="loginWithWechat()" class="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#07C160] text-white rounded-lg hover:bg-[#06AD56] transition-colors">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.045c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89l-.002-.002zm-2.746 2.4c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.983.97-.983zm4.842 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.983.969-.983z"/></svg>
+                        <span class="text-sm font-medium">Continue with WeChat</span>
+                    </button>
+                </div>
+                <p class="text-xs text-center text-gray-300">Your designs are saved locally until you sign in</p>
+            </div>
+        </div>
+
+        <!-- History Panel (Slide-over) -->
+        <div x-show="showHistoryPanel" x-cloak class="fixed inset-0 z-[90]">
+            <div class="absolute inset-0 bg-black/30" @click="showHistoryPanel = false"></div>
+            <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-xl flex flex-col"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="translate-x-full"
+                 x-transition:enter-end="translate-x-0"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="translate-x-0"
+                 x-transition:leave-end="translate-x-full">
+                <!-- Header -->
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                    <div class="flex items-center gap-4">
+                        <h3 class="text-lg font-serif">History</h3>
+                        <div class="flex bg-gray-100 rounded-lg p-0.5">
+                            <button @click="historyFavoritesOnly = false"
+                                    :class="historyFavoritesOnly ? 'text-gray-500' : 'bg-white text-charcoal shadow-sm'"
+                                    class="px-3 py-1 text-xs font-medium rounded-md transition-all">All</button>
+                            <button @click="historyFavoritesOnly = true"
+                                    :class="historyFavoritesOnly ? 'bg-white text-charcoal shadow-sm' : 'text-gray-500'"
+                                    class="px-3 py-1 text-xs font-medium rounded-md transition-all">Favorites</button>
+                        </div>
+                    </div>
+                    <button @click="showHistoryPanel = false" class="text-gray-400 hover:text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                </div>
+                <!-- List -->
+                <div class="flex-grow overflow-y-auto p-4 space-y-3">
+                    <template x-if="historyLoading">
+                        <div class="space-y-3">
+                            <template x-for="i in 3" :key="i">
+                                <div class="bg-gray-50 rounded-xl p-4 animate-pulse">
+                                    <div class="flex gap-4">
+                                        <div class="w-20 h-20 bg-gray-200 rounded-lg"></div>
+                                        <div class="flex-grow space-y-2">
+                                            <div class="h-4 bg-gray-200 rounded w-2/3"></div>
+                                            <div class="h-3 bg-gray-200 rounded w-1/2"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="!historyLoading && historyItems.length === 0">
+                        <div class="text-center py-12">
+                            <div class="w-16 h-16 bg-sage-light rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-sage"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </div>
+                            <p class="text-gray-400" x-text="historyFavoritesOnly ? 'No favorites yet' : 'No history yet'"></p>
+                            <p class="text-sm text-gray-300 mt-1">Your designs will appear here</p>
+                        </div>
+                    </template>
+                    <template x-if="!historyLoading && historyItems.length > 0">
+                        <div class="space-y-3">
+                            <template x-for="item in historyItems" :key="item.id">
+                                <div class="bg-gray-50 rounded-xl p-4 hover:bg-sage-light/30 transition-colors cursor-pointer group"
+                                     @click="loadHistoryItem(item)">
+                                    <div class="flex gap-4">
+                                        <div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
+                                            <img :src="getFullImageUrl(item.generated_image_url || item.original_image_url)" class="w-full h-full object-cover">
+                                            <button @click.stop="toggleFavorite(item)"
+                                                    class="absolute top-1 right-1 w-6 h-6 bg-white/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                                     :fill="item.is_favorite ? '#C27D63' : 'none'"
+                                                     :stroke="item.is_favorite ? '#C27D63' : 'currentColor'" stroke-width="2">
+                                                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div class="flex-grow min-w-0">
+                                            <div class="flex items-start justify-between">
+                                                <div>
+                                                    <p class="text-sm font-medium capitalize" x-text="item.style.replace('_', ' ')"></p>
+                                                    <p class="text-xs text-gray-400 capitalize" x-text="item.room_type"></p>
+                                                </div>
+                                                <button @click.stop="deleteHistoryItem(item)"
+                                                        class="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-gray-300 mt-2" x-text="formatDate(item.created_at)"></p>
+                                            <div class="flex items-center gap-2 mt-2">
+                                                <span class="text-xs bg-sage/10 text-sage px-2 py-0.5 rounded" x-text="item.budget"></span>
+                                                <template x-if="item.item_count > 0">
+                                                    <span class="text-xs text-gray-400" x-text="item.item_count + ' items'"></span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <!-- Load more -->
+                    <template x-if="!historyLoading && historyHasMore">
+                        <button @click="loadMoreHistory()" class="w-full py-3 text-sm text-sage hover:text-charcoal transition-colors">
+                            Load more
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <main class="flex-grow max-w-screen-xl mx-auto px-6 w-full py-8">
+
+            <!-- STEP 1: UPLOAD ONLY -->
+            <section x-show="step === 'upload'" x-cloak class="max-w-2xl mx-auto text-center space-y-8 py-16 fade-up">
+                <div class="space-y-3">
+                    <h1 class="text-4xl md:text-5xl font-serif leading-tight">
+                        One photo.<br>
+                        <span class="serif-italic text-sage">Instant transformation.</span>
+                    </h1>
+                    <p class="text-gray-400 text-base max-w-md mx-auto">
+                        Upload your room. AI picks the perfect style. Get shoppable results.
+                    </p>
+                </div>
+
+                <div class="upload-area relative rounded-2xl p-12 md:p-20 flex flex-col items-center justify-center cursor-pointer"
+                     @click="$refs.fileInput.click()"
+                     @dragover.prevent="dragover = true"
+                     @dragleave.prevent="dragover = false"
+                     @drop.prevent="handleDrop($event)"
+                     :class="{ 'dragover': dragover }">
+
+                    <input type="file" x-ref="fileInput" @change="handleFileSelect($event)" accept="image/jpeg,image/png,image/webp" class="hidden">
+
+                    <div class="space-y-4">
+                        <div class="w-20 h-20 bg-sage-light rounded-full flex items-center justify-center mx-auto text-sage">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                        </div>
+                        <div class="space-y-1">
+                            <p class="text-lg font-medium">Drop your room photo here</p>
+                            <p class="text-sm text-gray-400">or click to browse</p>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-xs text-gray-300">No choices needed. AI handles everything.</p>
+            </section>
+
+            <!-- STEP 2: PROCESSING -->
+            <section x-show="step === 'processing'" x-cloak class="max-w-xl mx-auto py-20 text-center space-y-10 fade-up">
+                <div class="relative">
+                    <img :src="previewUrl" class="w-full max-h-[300px] object-cover rounded-xl opacity-80">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <div class="w-24 h-24 rounded-full bg-white/90 flex items-center justify-center shadow-lg pulse-ring">
+                            <span class="text-3xl">✨</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <p class="text-xl font-serif italic text-sage" x-text="statusMessage">Designing your space...</p>
+                    <div class="flex justify-center gap-1">
+                        <template x-for="i in 3">
+                            <div class="w-2 h-2 rounded-full bg-sage"
+                                 :class="{ 'opacity-100': currentStage >= i, 'opacity-20': currentStage < i }"></div>
+                        </template>
+                    </div>
+                </div>
+            </section>
+
+            <!-- STEP 3: RESULTS -->
+            <section x-show="step === 'results'" x-cloak class="max-w-5xl mx-auto space-y-12 fade-up">
+
+                <!-- Header with Try Different Style -->
+                <div class="flex items-center justify-between">
+                    <h2 class="text-3xl md:text-4xl font-serif">Your Transformation</h2>
+                    <div class="flex items-center gap-4">
+                        <template x-if="loadingProducts">
+                            <span class="text-sm text-sage flex items-center gap-2">
+                                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                Finding products...
+                            </span>
+                        </template>
+                        <button @click="showStylePicker = !showStylePicker"
+                                class="text-sm font-medium text-sage hover:text-charcoal transition-colors flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                            Try Different Style
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Style Picker (collapsed by default) -->
+                <div x-show="showStylePicker" x-collapse class="bg-white border border-gray-100 rounded-xl p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-medium text-gray-600">Choose a style</p>
+                        <button @click="showStylePicker = false" class="text-gray-400 hover:text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="s in styles" :key="s.value">
+                            <button @click="selectedStyle = s.value"
+                                    :class="{ 'selected': selectedStyle === s.value }"
+                                    class="style-chip px-4 py-2 rounded-full text-sm border border-gray-200 hover:border-sage">
+                                <span x-text="s.label"></span>
+                            </button>
+                        </template>
+                    </div>
+                    <button @click="regenerateWithStyle()"
+                            :disabled="regenerating"
+                            class="btn-sage w-full py-3 rounded-lg font-medium disabled:opacity-50">
+                        <span x-show="!regenerating">Generate New Design</span>
+                        <span x-show="regenerating" class="flex items-center justify-center gap-2">
+                            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            Regenerating...
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Before/After Slider -->
+                <div class="slider-container" @mousemove="moveSlider($event)" @touchmove.prevent="moveSlider($event.touches[0])">
+                    <!-- Before image (sets the container height) -->
+                    <img :src="previewUrl" class="slider-img">
+                    <!-- After image (absolute overlay with clip) -->
+                    <div class="slider-overlay z-10" :style="{ clipPath: `inset(0 0 0 ${sliderPos}%)` }">
+                        <img :src="generatedImageUrl" class="w-full h-full object-cover">
+                    </div>
+                    <!-- Labels -->
+                    <div class="absolute bottom-4 left-4 z-20 bg-black/50 text-white px-3 py-1.5 rounded text-xs font-medium">Before</div>
+                    <div class="absolute bottom-4 right-4 z-20 bg-sage/80 text-white px-3 py-1.5 rounded text-xs font-medium">After</div>
+                    <!-- Handle -->
+                    <div class="slider-handle" :style="{ left: sliderPos + '%' }"></div>
+                </div>
+
+                <!-- Shopping List -->
+                <div class="space-y-6 pt-8 border-t border-gray-100">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-serif italic">Shop the look</h3>
+                        <template x-if="!loadingProducts && shoppingList.length > 0">
+                            <p class="text-lg font-medium">Total: $<span x-text="totalPrice?.toFixed(0) || '0'"></span></p>
+                        </template>
+                    </div>
+
+                    <!-- Loading skeleton -->
+                    <template x-if="loadingProducts">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <template x-for="i in 4" :key="i">
+                                <div class="bg-white border border-gray-100 rounded-xl p-6 flex gap-4 animate-pulse">
+                                    <div class="w-16 h-16 bg-gray-200 rounded-lg flex-shrink-0"></div>
+                                    <div class="flex-grow space-y-3">
+                                        <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+                                        <div class="h-5 bg-gray-200 rounded w-2/3"></div>
+                                        <div class="space-y-2">
+                                            <div class="h-12 bg-gray-100 rounded"></div>
+                                            <div class="h-12 bg-gray-100 rounded"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Actual shopping list -->
+                    <template x-if="!loadingProducts">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <template x-for="(item, idx) in shoppingList" :key="idx">
+                                <div class="bg-white border border-gray-100 rounded-xl p-6 flex gap-4">
+                                    <div class="w-16 h-16 bg-sage-light rounded-lg flex items-center justify-center text-2xl flex-shrink-0"
+                                         x-text="getCategoryIcon(item.identified_item.category)"></div>
+                                    <div class="flex-grow space-y-3">
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wider text-sage font-medium" x-text="item.identified_item.category"></p>
+                                            <p class="font-medium" x-text="item.identified_item.name"></p>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <template x-if="item.matched_products && item.matched_products.length > 0">
+                                                <template x-for="product in item.matched_products.slice(0, 2)" :key="product.id">
+                                                    <a :href="product.affiliate_link || '#'" target="_blank"
+                                                       class="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-sage-light transition-colors">
+                                                        <div class="flex items-center gap-2">
+                                                            <img :src="product.image_url" class="w-10 h-10 object-cover rounded" onerror="this.src='https://via.placeholder.com/40'">
+                                                            <span class="text-xs text-gray-600 line-clamp-1" x-text="product.name"></span>
+                                                        </div>
+                                                        <span class="text-sm font-medium text-sage">$<span x-text="product.price?.toFixed(0)"></span></span>
+                                                    </a>
+                                                </template>
+                                            </template>
+                                            <template x-if="!item.matched_products || item.matched_products.length === 0">
+                                                <p class="text-xs text-gray-400 italic">No matching products found</p>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Empty state -->
+                    <template x-if="!loadingProducts && shoppingList.length === 0">
+                        <p class="text-center text-gray-400 py-8">No items identified in the design.</p>
+                    </template>
+                </div>
+
+                <!-- Start Over -->
+                <div class="text-center pt-8">
+                    <button @click="reset()" class="text-sm text-gray-400 hover:text-sage transition-colors">
+                        Start over with a new photo
+                    </button>
+                </div>
+            </section>
+
+            <!-- ERROR STATE -->
+            <section x-show="step === 'error'" x-cloak class="max-w-md mx-auto py-20 text-center space-y-6 fade-up">
+                <div class="w-16 h-16 bg-red-50 text-red-400 rounded-full flex items-center justify-center mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-xl font-serif">Something went wrong</p>
+                    <p class="text-sm text-gray-400" x-text="errorMessage"></p>
+                </div>
+                <button @click="reset()" class="btn-sage px-8 py-3 rounded-lg text-sm font-medium">
+                    Try again
+                </button>
+            </section>
+
+        </main>
+
+        <footer class="bg-charcoal text-white py-8 mt-auto">
+            <div class="max-w-screen-xl mx-auto px-6 text-center">
+                <p class="text-xs text-gray-500">Makeover Camera v2 - Zero decisions. Instant style.</p>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        const BACKEND_URL = window.__HOMEGLOW_BACKEND_URL__ || localStorage.getItem('HOMEGLOW_BACKEND_URL') || '';
+        const API_BASE = (BACKEND_URL ? BACKEND_URL.replace(/\/$/, '') : '') + '/api/v1';
+
+        function getFullImageUrl(path) {
+            if (!path) return '';
+            if (path.startsWith('http')) return path;
+            return BACKEND_URL + (path.startsWith('/') ? '' : '/') + path;
+        }
+
+        function homeGlowV2() {
+            return {
+                step: 'upload',
+                dragover: false,
+                previewUrl: null,
+                imageId: null,
+                taskId: null,
+                statusMessage: 'Analyzing your space...',
+                currentStage: 1,
+
+                // Results
+                generatedImageUrl: null,
+                shoppingList: [],
+                totalPrice: 0,
+                sliderPos: 50,
+                loadingProducts: false,
+
+                // Style override
+                showStylePicker: false,
+                selectedStyle: null,
+                regenerating: false,
+                styles: [
+                    { value: 'boho', label: 'Bohemian' },
+                    { value: 'modern_minimalist', label: 'Modern Minimalist' },
+                    { value: 'scandinavian', label: 'Scandinavian' },
+                    { value: 'coastal', label: 'Coastal' },
+                    { value: 'industrial', label: 'Industrial' },
+                    { value: 'japanese', label: 'Japanese' },
+                    { value: 'vintage', label: 'Vintage' },
+                ],
+
+                errorMessage: '',
+
+                // Auth & User
+                user: null,
+                accessToken: null,
+                showLoginModal: false,
+                showUserMenu: false,
+
+                // History
+                showHistoryPanel: false,
+                historyItems: [],
+                historyCount: 0,
+                historyLoading: false,
+                historyFavoritesOnly: false,
+                historyPage: 1,
+                historyHasMore: false,
+
+                // Device ID for guest
+                deviceId: null,
+
+                init() {
+                    // Load device ID or generate new one
+                    this.deviceId = localStorage.getItem('homeglow_device_id');
+                    if (!this.deviceId) {
+                        this.deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                        localStorage.setItem('homeglow_device_id', this.deviceId);
+                    }
+
+                    // Load saved token
+                    this.accessToken = localStorage.getItem('homeglow_token');
+                    if (this.accessToken) {
+                        this.fetchUserInfo();
+                    }
+
+                    // Load history count
+                    this.loadHistoryCount();
+
+                    // Watch for favorites toggle to reload history
+                    this.$watch('historyFavoritesOnly', () => {
+                        if (this.showHistoryPanel) {
+                            this.historyPage = 1;
+                            this.loadHistory();
+                        }
+                    });
+                },
+
+                getAuthHeaders() {
+                    const headers = {
+                        'X-Device-ID': this.deviceId
+                    };
+                    if (this.accessToken) {
+                        headers['Authorization'] = `Bearer ${this.accessToken}`;
+                    }
+                    return headers;
+                },
+
+                async fetchUserInfo() {
+                    try {
+                        const res = await fetch(`${API_BASE}/auth/me`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            this.user = await res.json();
+                        } else {
+                            // Token expired or invalid
+                            this.accessToken = null;
+                            localStorage.removeItem('homeglow_token');
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch user info:', e);
+                    }
+                },
+
+                async loginWithGoogle() {
+                    // In production, this would use Google OAuth flow
+                    // For now, use dev login in debug mode
+                    try {
+                        const fd = new FormData();
+                        fd.append('nickname', 'Test User');
+                        const res = await fetch(`${API_BASE}/auth/dev-login`, {
+                            method: 'POST',
+                            body: fd
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.accessToken = data.access_token;
+                            localStorage.setItem('homeglow_token', data.access_token);
+                            await this.fetchUserInfo();
+                            this.showLoginModal = false;
+                            // Sync local history if any
+                            await this.syncLocalHistory();
+                            this.loadHistory();
+                        } else {
+                            const err = await res.json();
+                            alert(err.detail || 'Login failed');
+                        }
+                    } catch (e) {
+                        alert('Login failed: ' + e.message);
+                    }
+                },
+
+                async loginWithWechat() {
+                    alert('WeChat login requires configuration. Using test login instead.');
+                    await this.loginWithGoogle();
+                },
+
+                async logout() {
+                    this.user = null;
+                    this.accessToken = null;
+                    localStorage.removeItem('homeglow_token');
+                    this.showUserMenu = false;
+                    this.historyItems = [];
+                    this.loadHistoryCount();
+                },
+
+                async syncLocalHistory() {
+                    // Get local history from localStorage
+                    const localHistory = JSON.parse(localStorage.getItem('homeglow_local_history') || '[]');
+                    if (localHistory.length > 0 && this.accessToken) {
+                        try {
+                            await fetch(`${API_BASE}/history/sync`, {
+                                method: 'POST',
+                                headers: {
+                                    ...this.getAuthHeaders(),
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(localHistory)
+                            });
+                            // Clear local history after sync
+                            localStorage.removeItem('homeglow_local_history');
+                        } catch (e) {
+                            console.error('Failed to sync local history:', e);
+                        }
+                    }
+                },
+
+                toggleHistoryPanel() {
+                    this.showHistoryPanel = !this.showHistoryPanel;
+                    if (this.showHistoryPanel) {
+                        this.historyPage = 1;
+                        this.loadHistory();
+                    }
+                },
+
+                async loadHistoryCount() {
+                    try {
+                        const res = await fetch(`${API_BASE}/history?page=1&page_size=1`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.historyCount = data.total;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load history count:', e);
+                    }
+                },
+
+                async loadHistory() {
+                    this.historyLoading = true;
+                    try {
+                        const params = new URLSearchParams({
+                            page: this.historyPage,
+                            page_size: 10,
+                            favorites_only: this.historyFavoritesOnly
+                        });
+                        const res = await fetch(`${API_BASE}/history?${params}`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.historyItems = data.items;
+                            this.historyHasMore = data.has_more;
+                            this.historyCount = data.total;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load history:', e);
+                    } finally {
+                        this.historyLoading = false;
+                    }
+                },
+
+                async loadMoreHistory() {
+                    this.historyPage++;
+                    try {
+                        const params = new URLSearchParams({
+                            page: this.historyPage,
+                            page_size: 10,
+                            favorites_only: this.historyFavoritesOnly
+                        });
+                        const res = await fetch(`${API_BASE}/history?${params}`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.historyItems = [...this.historyItems, ...data.items];
+                            this.historyHasMore = data.has_more;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load more history:', e);
+                    }
+                },
+
+                async loadHistoryItem(item) {
+                    // Load full details and show in results view
+                    try {
+                        const res = await fetch(`${API_BASE}/history/${item.id}`, {
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const detail = await res.json();
+                            this.previewUrl = getFullImageUrl(detail.original_image_url);
+                            this.generatedImageUrl = getFullImageUrl(detail.generated_image_url);
+                            this.shoppingList = detail.shopping_list || [];
+                            this.totalPrice = detail.total_price || 0;
+                            this.loadingProducts = false;
+                            this.step = 'results';
+                            this.showHistoryPanel = false;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load history item:', e);
+                    }
+                },
+
+                async toggleFavorite(item) {
+                    try {
+                        const res = await fetch(`${API_BASE}/history/${item.id}/favorite`, {
+                            method: 'POST',
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            item.is_favorite = data.is_favorite;
+                            // If in favorites view and unfavorited, remove from list
+                            if (this.historyFavoritesOnly && !item.is_favorite) {
+                                this.historyItems = this.historyItems.filter(i => i.id !== item.id);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to toggle favorite:', e);
+                    }
+                },
+
+                async deleteHistoryItem(item) {
+                    if (!confirm('Delete this design?')) return;
+                    try {
+                        const res = await fetch(`${API_BASE}/history/${item.id}`, {
+                            method: 'DELETE',
+                            headers: this.getAuthHeaders()
+                        });
+                        if (res.ok) {
+                            this.historyItems = this.historyItems.filter(i => i.id !== item.id);
+                            this.historyCount--;
+                        }
+                    } catch (e) {
+                        console.error('Failed to delete history item:', e);
+                    }
+                },
+
+                formatDate(dateStr) {
+                    const date = new Date(dateStr);
+                    const now = new Date();
+                    const diff = now - date;
+                    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    if (days === 0) return 'Today';
+                    if (days === 1) return 'Yesterday';
+                    if (days < 7) return `${days} days ago`;
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                },
+
+                async saveToHistory(result) {
+                    // Save completed generation to history
+                    try {
+                        const historyData = {
+                            original_image_url: this.previewUrl,
+                            room_type: result.detected_room_type || 'room',
+                            style: result.applied_style || 'auto',
+                            budget: result.budget || 'medium',
+                            generated_image_url: result.generated_image_url,
+                            shopping_list: result.shopping_list,
+                            total_price: result.total_estimated_price
+                        };
+
+                        const res = await fetch(`${API_BASE}/history`, {
+                            method: 'POST',
+                            headers: {
+                                ...this.getAuthHeaders(),
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(historyData)
+                        });
+
+                        if (res.ok) {
+                            this.historyCount++;
+                        } else if (!this.accessToken) {
+                            // Save to local storage for guests
+                            const localHistory = JSON.parse(localStorage.getItem('homeglow_local_history') || '[]');
+                            localHistory.unshift(historyData);
+                            localStorage.setItem('homeglow_local_history', JSON.stringify(localHistory.slice(0, 50)));
+                        }
+                    } catch (e) {
+                        console.error('Failed to save to history:', e);
+                    }
+                },
+
+                handleFileSelect(e) {
+                    if (e.target.files[0]) this.processFile(e.target.files[0]);
+                },
+
+                handleDrop(e) {
+                    this.dragover = false;
+                    if (e.dataTransfer.files[0]) this.processFile(e.dataTransfer.files[0]);
+                },
+
+                processFile(file) {
+                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                        alert('Please upload JPG, PNG, or WebP');
+                        return;
+                    }
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('Image must be under 10MB');
+                        return;
+                    }
+                    this.previewUrl = URL.createObjectURL(file);
+                    this.uploadAndTransform(file);
+                },
+
+                async uploadAndTransform(file) {
+                    this.step = 'processing';
+                    this.statusMessage = 'Uploading your photo...';
+                    this.currentStage = 1;
+
+                    try {
+                        // Step 1: Upload
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        const uploadRes = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+
+                        if (!uploadRes.ok) {
+                            const err = await uploadRes.json();
+                            throw new Error(err.detail || 'Upload failed');
+                        }
+
+                        const uploadData = await uploadRes.json();
+                        this.imageId = uploadData.image_id;
+
+                        // Step 2: Start V2 transform (zero decisions)
+                        this.statusMessage = 'AI is designing your space...';
+                        this.currentStage = 2;
+
+                        const transformFd = new FormData();
+                        transformFd.append('image_id', this.imageId);
+                        transformFd.append('lang', 'en');
+
+                        const transformRes = await fetch(`${API_BASE}/v2/transform`, { method: 'POST', body: transformFd });
+
+                        if (!transformRes.ok) {
+                            const err = await transformRes.json();
+                            throw new Error(err.detail || 'Transform failed');
+                        }
+
+                        const transformData = await transformRes.json();
+                        this.taskId = transformData.task_id;
+
+                        // Step 3: Poll for results
+                        this.pollTaskStatus();
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    }
+                },
+
+                async pollTaskStatus() {
+                    if (!this.taskId) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/task/${this.taskId}`);
+                        if (!res.ok) throw new Error('Failed to check status');
+
+                        const data = await res.json();
+
+                        // Update status message based on task status
+                        const messages = {
+                            'pending': 'Preparing your transformation...',
+                            'generating': 'AI is creating your new room...',
+                            'identifying': 'Finding items in the design...',
+                            'matching': 'Matching products you can buy...'
+                        };
+                        this.statusMessage = messages[data.status] || 'Processing...';
+
+                        if (data.status === 'generating') this.currentStage = 2;
+                        if (data.status === 'identifying' || data.status === 'matching') this.currentStage = 3;
+
+                        // Show image as soon as it's ready (during identifying/matching phase)
+                        if ((data.status === 'identifying' || data.status === 'matching') && data.result?.generated_image_url) {
+                            if (this.step !== 'results') {
+                                // First time showing results - show image with loading skeleton for products
+                                this.generatedImageUrl = getFullImageUrl(data.result.generated_image_url);
+                                this.loadingProducts = true;
+                                this.shoppingList = [];
+                                this.step = 'results';
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                            // Continue polling for products
+                            setTimeout(() => this.pollTaskStatus(), 2000);
+                        } else if (data.status === 'completed') {
+                            this.handleResults(data.result);
+                        } else if (data.status === 'failed') {
+                            throw new Error(data.message || 'Generation failed');
+                        } else {
+                            setTimeout(() => this.pollTaskStatus(), 2000);
+                        }
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    }
+                },
+
+                handleResults(result) {
+                    this.generatedImageUrl = getFullImageUrl(result.generated_image_url);
+                    this.shoppingList = result.shopping_list || [];
+                    this.totalPrice = result.total_estimated_price || 0;
+                    this.loadingProducts = false;
+                    const wasNotResults = this.step !== 'results';
+                    this.step = 'results';
+                    if (wasNotResults) {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                    // Save to history
+                    this.saveToHistory(result);
+                },
+
+                async regenerateWithStyle() {
+                    if (!this.selectedStyle || !this.imageId) return;
+
+                    this.regenerating = true;
+                    this.showStylePicker = false;
+                    this.step = 'processing';
+                    this.statusMessage = `Redesigning with ${this.selectedStyle} style...`;
+                    this.currentStage = 2;
+                    this.loadingProducts = false;
+                    this.shoppingList = [];
+
+                    try {
+                        const fd = new FormData();
+                        fd.append('image_id', this.imageId);
+                        fd.append('style', this.selectedStyle);
+                        fd.append('lang', 'en');
+
+                        const res = await fetch(`${API_BASE}/v2/transform/override`, { method: 'POST', body: fd });
+
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.detail || 'Regeneration failed');
+                        }
+
+                        const data = await res.json();
+                        this.taskId = data.task_id;
+                        this.pollTaskStatus();
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    } finally {
+                        this.regenerating = false;
+                    }
+                },
+
+                moveSlider(e) {
+                    if (this.step !== 'results') return;
+                    const container = document.querySelector('.slider-container');
+                    if (!container) return;
+                    const rect = container.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    this.sliderPos = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                },
+
+                getCategoryIcon(category) {
+                    const icons = {
+                        'Textiles': '🛋️', 'Lighting': '💡', 'Plants': '🌿',
+                        'Wall Decor': '🖼️', 'Decor': '📚', 'Rug': '🟫', 'Furniture': '🪑'
+                    };
+                    return icons[category] || '📦';
+                },
+
+                reset() {
+                    this.step = 'upload';
+                    this.previewUrl = null;
+                    this.imageId = null;
+                    this.taskId = null;
+                    this.generatedImageUrl = null;
+                    this.shoppingList = [];
+                    this.totalPrice = 0;
+                    this.sliderPos = 50;
+                    this.loadingProducts = false;
+                    this.showStylePicker = false;
+                    this.selectedStyle = null;
+                    this.errorMessage = '';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            };
+        }
+    </script>
+</body>
+</html>

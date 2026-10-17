@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>换装相机 - 一键改造你的家</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 品牌色 */
+        :root {
+            --sage: #8B9D7F;
+            --sage-light: #D4E2D4;
+            --charcoal: #3A3A3A;
+            --cream: #FAF8F5;
+            --terracotta: #C27D63;
+        }
+
+        [x-cloak] { display: none !important; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: var(--cream);
+            color: var(--charcoal);
+        }
+
+        /* 打字机光标闪烁 */
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* 卡片滑入动画 */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-card {
+            animation: slideUp 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div x-data="homeGlowSimple()" x-init="init()" class="min-h-screen flex flex-col bg-cream">
+
+        <!-- 顶部导航 -->
+        <nav class="border-b border-gray-100 bg-white/90 backdrop-blur-md sticky top-0 z-50">
+            <div class="max-w-screen-xl mx-auto px-4 h-14 flex items-center justify-between">
+                <span class="text-xl font-serif font-bold">换装相机<span style="color: var(--sage)">.</span></span>
+                <button @click="reset()" x-show="step !== 'upload'" class="text-sm text-gray-500 hover:text-sage transition-colors">
+                    重新开始
+                </button>
+            </div>
+        </nav>
+
+        <main class="flex-grow max-w-screen-xl mx-auto px-4 w-full py-6">
+
+            <!-- 步骤1: 上传 -->
+            <section x-show="step === 'upload'" x-cloak class="max-w-xl mx-auto text-center space-y-6 py-12">
+                <h1 class="text-3xl font-serif font-bold">
+                    一张照片<br>
+                    <span style="color: var(--sage)">看见家的另一种可能</span>
+                </h1>
+                <p class="text-gray-400 text-sm">
+                    上传房间照片，AI 自动匹配风格，生成改造方案和购物清单
+                </p>
+
+                <div class="border-2 border-dashed border-gray-200 rounded-2xl p-16 cursor-pointer hover:border-sage transition-colors"
+                     @click="$refs.fileInput.click()">
+                    <input type="file" x-ref="fileInput" @change="handleFileSelect($event)" accept="image/jpeg,image/png,image/webp" class="hidden">
+                    <div class="space-y-4">
+                        <div class="w-16 h-16 bg-sage/10 rounded-full flex items-center justify-center mx-auto" style="color: var(--sage)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                            </svg>
+                        </div>
+                        <p class="font-medium">点击上传照片</p>
+                        <p class="text-xs text-gray-400">支持 JPG、PNG、WebP，最大 10MB</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 步骤2: 处理中 -->
+            <section x-show="step === 'processing'" x-cloak class="max-w-2xl mx-auto pt-4">
+
+                <!-- 原图区域 -->
+                <div class="relative rounded-2xl overflow-hidden bg-gradient-to-br from-sage/5 to-sage-light/10" style="min-height: 500px;">
+
+                    <!-- 背景：原图 -->
+                    <div x-show="uploadedImageUrl" class="absolute inset-0">
+                        <img :src="uploadedImageUrl" class="w-full h-full object-cover" alt="原图">
+                        <div class="absolute inset-0 bg-gradient-to-b from-white/70 via-white/80 to-white/70 backdrop-blur-sm"></div>
+                    </div>
+
+                    <!-- 前景：状态卡片 -->
+                    <div class="relative z-10 flex flex-col items-center justify-center px-8 py-16" style="min-height: 500px;">
+
+                        <!-- 状态卡片 -->
+                        <div class="w-full max-w-md bg-white/90 backdrop-blur-md rounded-2xl border border-gray-100 shadow-lg p-6 space-y-4 status-card">
+
+                            <!-- 标题区 -->
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2" style="color: var(--sage)">
+                                    <!-- 动态图标 -->
+                                    <svg x-show="!displayedPrompt" class="w-5 h-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 6v6l4 2"/>
+                                    </svg>
+                                    <svg x-show="displayedPrompt" class="w-5 h-5" :class="{ 'animate-pulse': isTyping }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 20h9"/>
+                                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                    </svg>
+                                    <span class="text-sm font-medium" x-text="displayedPrompt ? 'AI 设计思路' : 'AI 正在分析'"></span>
+                                </div>
+                                <!-- 跳过按钮 -->
+                                <button x-show="isTyping" @click="stopTypewriter()"
+                                        class="text-xs text-gray-400 hover:text-sage transition-colors px-2 py-1">
+                                    跳过 →
+                                </button>
+                            </div>
+
+                            <!-- 内容区 -->
+                            <div class="min-h-[120px]">
+                                <!-- 等待VLLM -->
+                                <div x-show="!displayedPrompt" class="space-y-3 py-4">
+                                    <div class="flex items-center gap-3 text-gray-600">
+                                        <div class="w-2 h-2 rounded-full animate-pulse" style="background: var(--sage)"></div>
+                                        <p class="text-sm">正在识别空间元素...</p>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-gray-500">
+                                        <div class="w-2 h-2 rounded-full animate-pulse animation-delay-200" style="background: var(--sage); opacity: 0.6"></div>
+                                        <p class="text-sm">分析风格偏好...</p>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-gray-400">
+                                        <div class="w-2 h-2 rounded-full animate-pulse animation-delay-400" style="background: var(--sage); opacity: 0.3"></div>
+                                        <p class="text-sm">生成设计方案...</p>
+                                    </div>
+                                </div>
+
+                                <!-- VLLM prompt打字机 -->
+                                <div x-show="displayedPrompt" class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap" style="line-height: 1.8;">
+                                    <span x-text="displayedPrompt"></span>
+                                    <!-- 光标 -->
+                                    <span x-show="isTyping" class="inline-block w-0.5 h-4 ml-0.5"
+                                          style="background: var(--sage); animation: blink 1s infinite;"></span>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- 步骤3: 结果展示（保持原有逻辑） -->
+            <section x-show="step === 'results'" x-cloak class="max-w-4xl mx-auto space-y-6">
+                <h2 class="text-2xl font-serif font-bold">改造效果</h2>
+
+                <div class="relative rounded-2xl overflow-hidden">
+                    <img :src="generatedImageUrl" class="w-full h-auto">
+                </div>
+
+                <div class="text-center">
+                    <p class="text-gray-500 text-sm">购物清单功能开发中...</p>
+                </div>
+            </section>
+
+            <!-- 错误状态 -->
+            <section x-show="step === 'error'" x-cloak class="max-w-sm mx-auto py-16 text-center space-y-5">
+                <div class="w-14 h-14 bg-red-50 text-red-400 rounded-full flex items-center justify-center mx-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+                    </svg>
+                </div>
+                <p class="text-sm text-gray-400" x-text="errorMessage"></p>
+                <button @click="reset()" class="px-6 py-2.5 rounded-lg text-sm font-medium text-white" style="background: var(--sage)">
+                    重试
+                </button>
+            </section>
+
+        </main>
+
+        <footer class="py-6 text-center text-xs text-gray-400">
+            换装相机 - 一键改造你的家
+        </footer>
+
+    </div>
+
+    <script>
+        const BACKEND_URL = window.__HOMEGLOW_BACKEND_URL__ || localStorage.getItem('HOMEGLOW_BACKEND_URL') || '';
+        const API_BASE = (BACKEND_URL ? BACKEND_URL.replace(/\/$/, '') : '') + '/api/v1';
+
+        function getFullImageUrl(path) {
+            if (!path) return '';
+            if (path.startsWith('http')) return path;
+            return BACKEND_URL + (path.startsWith('/') ? '' : '/') + path;
+        }
+
+        function homeGlowSimple() {
+            return {
+                step: 'upload',
+                uploadedImageUrl: null,
+                imageId: null,
+                taskId: null,
+                generatedImageUrl: null,
+                errorMessage: '',
+
+                // 打字机
+                generationPrompt: '',
+                displayedPrompt: '',
+                isTyping: false,
+                typingSpeed: 50,  // 每字50ms
+                typewriterTimer: null,
+
+                init() {
+                    console.log('换装相机 Simple 初始化');
+                },
+
+                handleFileSelect(e) {
+                    if (e.target.files[0]) this.processFile(e.target.files[0]);
+                },
+
+                processFile(file) {
+                    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                        alert('请上传 JPG、PNG 或 WebP 格式的图片');
+                        return;
+                    }
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert('图片大小不能超过 10MB');
+                        return;
+                    }
+                    this.uploadAndTransform(file);
+                },
+
+                async uploadAndTransform(file) {
+                    this.step = 'processing';
+                    this.displayedPrompt = '';
+                    this.isTyping = false;
+
+                    try {
+                        // 上传
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        const uploadRes = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+
+                        if (!uploadRes.ok) {
+                            const err = await uploadRes.json();
+                            throw new Error(err.detail || '上传失败');
+                        }
+
+                        const uploadData = await uploadRes.json();
+                        this.imageId = uploadData.image_id;
+                        this.uploadedImageUrl = getFullImageUrl(uploadData.image_url);
+
+                        // 开始转换
+                        const transformFd = new FormData();
+                        transformFd.append('image_id', this.imageId);
+                        transformFd.append('lang', 'zh');
+
+                        const transformRes = await fetch(`${API_BASE}/v2/transform`, { method: 'POST', body: transformFd });
+
+                        if (!transformRes.ok) {
+                            const err = await transformRes.json();
+                            throw new Error(err.detail || '转换失败');
+                        }
+
+                        const transformData = await transformRes.json();
+                        this.taskId = transformData.task_id;
+
+                        // 轮询结果
+                        this.pollTaskStatus();
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    }
+                },
+
+                async pollTaskStatus() {
+                    if (!this.taskId) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/task/${this.taskId}`);
+                        if (!res.ok) throw new Error('获取状态失败');
+
+                        const data = await res.json();
+
+                        console.log('📊 任务状态:', data.status, 'prompt:', data.result?.generation_prompt?.length);
+
+                        // 收到VLLM生成的prompt时，启动打字机
+                        if (data.result?.generation_prompt && !this.displayedPrompt) {
+                            console.log('🎨 启动打字机:', data.result.generation_prompt.length, '字');
+                            this.startTypewriter(data.result.generation_prompt, this.typingSpeed);
+                        }
+
+                        // 完成
+                        if (data.status === 'completed') {
+                            this.generatedImageUrl = getFullImageUrl(data.result.generated_image_url);
+                            this.step = 'results';
+                            // 停止打字机
+                            this.stopTypewriter();
+                        } else if (data.status === 'failed') {
+                            throw new Error(data.message || '生成失败');
+                        } else {
+                            // 继续轮询
+                            setTimeout(() => this.pollTaskStatus(), 2000);
+                        }
+
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                        this.step = 'error';
+                    }
+                },
+
+                // 启动打字机
+                startTypewriter(fullText, speed = 50) {
+                    if (this.typewriterTimer) {
+                        clearTimeout(this.typewriterTimer);
+                    }
+
+                    this.generationPrompt = fullText;
+                    this.displayedPrompt = '';
+                    this.isTyping = true;
+
+                    let index = 0;
+                    const typeNextChar = () => {
+                        if (index < fullText.length && this.isTyping) {
+                            this.displayedPrompt += fullText[index];
+                            index++;
+                            this.typewriterTimer = setTimeout(typeNextChar, speed);
+                        } else {
+                            this.isTyping = false;
+                            this.typewriterTimer = null;
+                        }
+                    };
+
+                    setTimeout(() => typeNextChar(), 100);
+                },
+
+                // 停止打字机（跳过）
+                stopTypewriter() {
+                    if (this.typewriterTimer) {
+                        clearTimeout(this.typewriterTimer);
+                        this.typewriterTimer = null;
+                    }
+                    this.displayedPrompt = this.generationPrompt;
+                    this.isTyping = false;
+                },
+
+                reset() {
+                    if (this.typewriterTimer) {
+                        clearTimeout(this.typewriterTimer);
+                        this.typewriterTimer = null;
+                    }
+
+                    this.step = 'upload';
+                    this.uploadedImageUrl = null;
+                    this.imageId = null;
+                    this.taskId = null;
+                    this.generatedImageUrl = null;
+                    this.errorMessage = '';
+                    this.generationPrompt = '';
+                    this.displayedPrompt = '';
+                    this.isTyping = false;
+                }
+            };
+        }
+    </script>
+</body>
+</html>
